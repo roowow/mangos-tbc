@@ -29,7 +29,7 @@ find_package(ZLIB)
 if (NOT ZLIB_FOUND OR ZLIB_VERSION_STRING VERSION_LESS 1.2.13)
   FetchContent_Declare(
     zlib
-    GIT_REPOSITORY "https://github.com/madler/zlib.git"
+    GIT_REPOSITORY "git@github.com:madler/zlib.git"
     GIT_TAG "v1.2.13"
   )
   FetchContent_GetProperties(zlib)
