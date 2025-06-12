@@ -7030,6 +7030,18 @@ void Player::UpdateArea(uint32 newArea)
             SetPvPFreeForAll(false);
     }
 
+    if (newArea == 4080) // 奎尔丹纳斯岛区域ID
+    {
+        // 检查是否 GM 或特定条件（如阶段变量）
+        if (!IsGameMaster())
+        {
+            // 踢出玩家或传送回主城
+            GetSession()->SendAreaTriggerMessage("奎尔丹纳斯岛尚未开放。");
+            TeleportTo(530, -1863.74f, 5427.48f, -10.48f, 0); // 传送到沙塔斯为例
+            return;
+        }
+    }
+
     UpdateAreaDependentAuras();
 }
 
@@ -18350,6 +18362,17 @@ bool Player::ActivateTaxiPathTo(std::vector<uint32> const& nodes, Creature* npc 
     {
         GetSession()->SendActivateTaxiReply(ERR_TAXINOSUCHPATH);
         return false;
+    }
+
+    // 拦截任意路径中包含奎岛（213）
+    for (uint32 nodeId : nodes)
+    {
+        if (nodeId == 213)
+        {
+            GetSession()->SendActivateTaxiReply(ERR_TAXINOTVISITED);
+            GetSession()->SendNotification("奎尔丹纳斯岛尚未开放。");
+            return false;
+        }
     }
 
     // check node starting pos data set case if provided
