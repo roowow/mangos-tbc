@@ -2191,6 +2191,7 @@ void Creature::CallAssistance(Unit* enemy)
     // FIXME: should player pets call for assistance?
     if (!m_AlreadyCallAssistance && enemy && !HasCharmer())
     {
+        if (!AI()) return;
         MANGOS_ASSERT(AI());
 
         SetNoCallAssistance(true);
