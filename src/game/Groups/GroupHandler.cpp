@@ -953,6 +953,6 @@ void WorldSession::HandleGroupSwapSubGroupOpcode(WorldPacket& recv_data)
     if (subgroup1 == subgroup2)
         return;
 
-    group->ChangeMembersGroup(guid1, subgroup2);
+    group->ChangeMembersGroup(guid1, subgroup2, false);
     group->ChangeMembersGroup(guid2, subgroup1);
 }

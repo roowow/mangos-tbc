@@ -1433,6 +1433,7 @@ struct npc_vengeful_harbinger : public ScriptedAI
                 {
                     m_creature->GetMotionMaster()->Clear(false, true);
                     m_creature->GetMotionMaster()->MoveWaypoint(2);
+
                 }
                 break;
             }
