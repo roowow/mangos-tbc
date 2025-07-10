@@ -1368,7 +1368,7 @@ enum
     NPC_ORB_WAYPOINT_1 = 21443,
     NPC_DRAENEI_TOMB_GUARDIAN = 22285,
 
-    DBSCRIPT_VENGEFUL_HARBINGER_FAKE_DEATH = 10069,
+    DBSCRIPT_VENGEFUL_HARBINGER_FAKE_DEATH = 10063,
 
     EVENT_RESET_TIMER = 120000,
 
@@ -1493,6 +1493,7 @@ struct npc_vengeful_harbinger : public ScriptedAI
         m_creature->GetMotionMaster()->Clear(false, true);
         m_creature->GetMotionMaster()->MoveIdle();
         m_creature->GetMap()->ScriptsStart(SCRIPT_TYPE_RELAY, DBSCRIPT_VENGEFUL_HARBINGER_FAKE_DEATH, m_creature, m_creature);
+        m_creature->GetMap()->ScriptsStart(SCRIPT_TYPE_RELAY, 10067, m_creature, m_creature);
     }
 };
 

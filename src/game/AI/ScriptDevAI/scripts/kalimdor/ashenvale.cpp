@@ -350,7 +350,10 @@ struct npc_muglashAI : public npc_escortAI
         }
     }
 };
-
+UnitAI* GetAI_npc_muglashAI(Creature* pCreature)
+{
+    return new npc_muglashAI(pCreature);
+}
 bool QuestAccept_npc_muglash(Player* player, Creature* creature, const Quest* quest)
 {
     if (quest->GetQuestId() == QUEST_VORSHA)
@@ -809,7 +812,7 @@ void AddSC_ashenvale()
 {
     Script* pNewScript = new Script;
     pNewScript->Name = "npc_muglash";
-    pNewScript->GetAI = &GetNewAIInstance<npc_muglashAI>;
+    pNewScript->GetAI = &GetAI_npc_muglashAI;
     pNewScript->pQuestAcceptNPC = &QuestAccept_npc_muglash;
     pNewScript->RegisterSelf();
 

@@ -1,8 +1,8 @@
 -- 训练假人
 replace into creature_template(`Entry`,`Name`,`SubName`,`IconName`,`MinLevel`,`MaxLevel`,`HeroicEntry`,`DisplayId1`,`DisplayId2`,`DisplayId3`,`DisplayId4`,`DisplayIdProbability1`,`DisplayIdProbability2`,`DisplayIdProbability3`,`DisplayIdProbability4`,`Faction`,`Scale`,`Family`,`CreatureType`,`InhabitType`,`RegenerateStats`,`RacialLeader`,`NpcFlags`,`UnitFlags`,`DynamicFlags`,`ExtraFlags`,`CreatureTypeFlags`,`StaticFlags1`,`StaticFlags2`,`StaticFlags3`,`StaticFlags4`,`SpeedWalk`,`SpeedRun`,`Detection`,`CallForHelp`,`Pursuit`,`Leash`,`Timeout`,`UnitClass`,`Rank`,`Expansion`,`HealthMultiplier`,`PowerMultiplier`,`DamageMultiplier`,`DamageVariance`,`ArmorMultiplier`,`ExperienceMultiplier`,`StrengthMultiplier`,`AgilityMultiplier`,`StaminaMultiplier`,`IntellectMultiplier`,`SpiritMultiplier`,`MinLevelHealth`,`MaxLevelHealth`,`MinLevelMana`,`MaxLevelMana`,`MinMeleeDmg`,`MaxMeleeDmg`,`MinRangedDmg`,`MaxRangedDmg`,`Armor`,`MeleeAttackPower`,`RangedAttackPower`,`MeleeBaseAttackTime`,`RangedBaseAttackTime`,`DamageSchool`,`MinLootGold`,`MaxLootGold`,`LootId`,`PickpocketLootId`,`SkinningLootId`,`KillCredit1`,`KillCredit2`,`MechanicImmuneMask`,`SchoolImmuneMask`,`ResistanceHoly`,`ResistanceFire`,`ResistanceNature`,`ResistanceFrost`,`ResistanceShadow`,`ResistanceArcane`,`PetSpellDataId`,`MovementType`,`TrainerType`,`TrainerSpell`,`TrainerClass`,`TrainerRace`,`TrainerTemplateId`,`VendorTemplateId`,`EquipmentTemplateId`,`GossipMenuId`,`InteractionPauseTimer`,`CorpseDecay`,`SpellList`,`CharmedSpellList`,`StringId1`,`StringId2`,`AIName`,`ScriptName`) values 
-    (94952,'超级训练假人',null,null,'73','73',0,3019,0,0,0,100,0,0,0,1095,1,'0','9','2','14','0','0','0','0','131074','0','0','0','0','0',1,1,'18','0','15000','0','0','1','0','0',110,1,1,1,1.33333,1,1,1,1,1,1,'1000000','1000000','0','0',0,0,0,0,0,'0',0,'0','0','0',0,0,0,0,0,'0','0','0','0',0,0,0,0,0,0,0,'0','0',0,'0','0',0,0,0,0,-1,'0',0,0,'0','0','','')
-  , (94953,'高级训练假人',null,null,'50','50',0,3019,0,0,0,100,0,0,0,1095,1,'0','9','2','14','0','0','0','0','131074','0','0','0','0','0',1,1,'18','0','15000','0','0','1','0','0',330,1,1,1,1.33333,1,1,1,1,1,1,'1000000','1000000','0','0',0,0,0,0,0,'0',0,'0','0','0',0,0,0,0,0,'0','0','0','0',0,0,0,0,0,0,0,'0','0',0,'0','0',0,0,0,0,-1,'0',0,0,'0','0','','')
-  , (94954,'训练假人 ',null,null,'30','30',0,3019,0,0,0,100,0,0,0,1095,1,'0','9','2','14','0','0','0','0','131074','0','0','0','0','0',1,1,'18','0','15000','0','0','1','0','0',55,1,1,1,1.33333,1,1,1,1,1,1,'1000000','1000000','0','0',0,0,0,0,0,'0',0,'0','0','0',0,0,0,0,0,'0','0','0','0',0,0,0,0,0,0,0,'0','0',0,'0','0',0,0,0,0,-1,'0',0,0,'0','0','','');
+    (94952,'超级训练假人',null,null,'73','73',0,3019,0,0,0,100,0,0,0,1095,1,'0','9','3','14','0','0','0','0','131074','0','256','0','0','0',1,1,'18','0','15000','0','0','1','0','0',110,1,1,1,1.33333,1,1,1,1,1,1,'1000000','1000000','0','0',0,0,0,0,0,'0',0,'0','0','0',0,0,0,0,0,'0','0','0','0',0,0,0,0,0,0,0,'0','0',0,'0','0',0,0,0,0,-1,'0',0,0,'0','0','','')
+  , (94953,'高级训练假人',null,null,'50','50',0,3019,0,0,0,100,0,0,0,1095,1,'0','9','3','14','0','0','0','0','131074','0','256','0','0','0',1,1,'18','0','15000','0','0','1','0','0',330,1,1,1,1.33333,1,1,1,1,1,1,'1000000','1000000','0','0',0,0,0,0,0,'0',0,'0','0','0',0,0,0,0,0,'0','0','0','0',0,0,0,0,0,0,0,'0','0',0,'0','0',0,0,0,0,-1,'0',0,0,'0','0','','')
+  , (94954,'训练假人 ',null,null,'30','30',0,3019,0,0,0,100,0,0,0,1095,1,'0','9','3','14','0','0','0','0','131074','0','256','0','0','0',1,1,'18','0','15000','0','0','1','0','0',55,1,1,1,1.33333,1,1,1,1,1,1,'1000000','1000000','0','0',0,0,0,0,0,'0',0,'0','0','0',0,0,0,0,0,'0','0','0','0',0,0,0,0,0,0,0,'0','0',0,'0','0',0,0,0,0,-1,'0',0,0,'0','0','','');
 
 replace into creature(id,map,`spawnMask`,position_x,position_y,position_z,orientation,spawntimesecsmin,spawntimesecsmax,spawndist,`MovementType`) values 
     (94952,1,'1',1612.59000000000000000000,-4323.37000000000000000000,2.19202000000000000000,1.16080000000000000000,'300','300',0,'0')
@@ -63,9 +63,9 @@ REPLACE INTO creature(id,map,`spawnMask`,position_x,position_y,position_z,orient
 
 
 -- 修复费伍德换药膏任务 第一次任务都正常给经验
-update quest_template qt SET qt.RewMoneyMaxLevel = 3660 where qt.entry in (5882,5883,5884,5885,5886,5887,5888,5889,5890,5891) 
+update quest_template qt SET qt.RewMoneyMaxLevel = 3660 where qt.entry in (5882,5883,5884,5885,5886,5887,5888,5889,5890,5891) ;
 -- 后续任务都不给经验
-update quest_template qt SET qt.RewMoneyMaxLevel = 0 where qt.entry in (4103,4104,4105,4106,4107,4108,4109,4110,4111,4112) 
+update quest_template qt SET qt.RewMoneyMaxLevel = 0 where qt.entry in (4103,4104,4105,4106,4107,4108,4109,4110,4111,4112) ;
 
 
 -- 奥山装备 加声望 道具限制
@@ -153,5 +153,8 @@ UPDATE `gameobject_template` SET `type` = '2', `faction` = '35', `data0` = '0', 
 -- 任务9164
 UPDATE quest_template SET ReqItemCount3 = 0, ReqItemCount4 = 1, ReqCreatureOrGOId3=16209,ReqCreatureOrGOId4=0,ReqCreatureOrGOCount3 = 1, ReqCreatureOrGOCount4 = 0 WHERE entry= 9164;
 UPDATE locales_quest lq SET lq.ObjectiveText3_loc4="营救游侠维多兰",lq.ObjectiveText4_loc4=""  WHERE entry = 9164;
+
+-- 任务 10911 刀锋山邪能火炮不能被控制
+UPDATE `creature_template` SET `StaticFlags3` = '0' WHERE `creature_template`.`Entry` = 22443;
 
 

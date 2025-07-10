@@ -165,8 +165,8 @@ void AddSC_stranglethorn_vale()
     pNewScript->GetAI = &GetAI_mob_yenniku;
     pNewScript->RegisterSelf();
 
-    Script* pNewScript2 = new Script;
-    pNewScript2->Name = "mob_colonel_kurzen";
-    pNewScript2->GetAI = &GetNewAIInstance<mob_colonel_kurzenAI>;
-    pNewScript2->RegisterSelf();
+    pNewScript = new Script;
+    pNewScript->Name = "mob_colonel_kurzen";
+    pNewScript->GetAI = &GetNewAIInstance<mob_colonel_kurzenAI>;
+    pNewScript->RegisterSelf();
 }
