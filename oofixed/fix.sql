@@ -145,16 +145,17 @@ replace INTO `creature_template` (`Entry`, `Name`, `SubName`, `IconName`, `MinLe
 (16367, 'Botanist Tyniarrel', 'Herbalism Trainer & Supplies', NULL, 15, 15, 0, 16134, 0, 0, 0, 100, 0, 0, 0, 1604, 1, 0, 7, 3, 14, 0, 145, 4608, 0, 65538, 0, 2, 0, 0, 0, 1.125, 1.14286, 18, 0, 15000, 0, 0, 8, 0, 0, 1.05, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 174, 174, 790, 790, 26, 31, 0, 0, 363, 13, 100, 2000, 2000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 0, 0, 0, 1030, 128, 16367, 0, -1, 0, 0, 0, 0, 0, '', '');
 
 -- 任务 891
-UPDATE `quest_template` SET `ReqItemId1` = '0', `ReqItemId4` = '5078', `ReqItemCount1` = '0', `ReqItemCount4` = '10', `ReqCreatureOrGOId1` = '3393', `ReqCreatureOrGOId2` = '3455', `ReqCreatureOrGOId3` = '3454', `ReqCreatureOrGOId4` = '0', `ReqCreatureOrGOCount1` = '1' WHERE `quest_template`.`entry` = 891;
+UPDATE `quest_template` SET `ReqItemId1` = '0', `ReqItemId4` = '5078', `ReqItemCount1` = '0', `ReqItemCount4` = '10', `ReqCreatureOrGOId1` = '3393', `ReqCreatureOrGOId2` = '3455', `ReqCreatureOrGOId3` = '3454', `ReqCreatureOrGOId4` = '0', `ReqCreatureOrGOCount1` = '1', `ReqCreatureOrGOCount4` = '0' WHERE `quest_template`.`entry` = 891;
 -- 任务 9418
 UPDATE `spell_template` SET `Effect1` = '33' WHERE `spell_template`.`Id` = 29764;
 UPDATE `gameobject_template` SET `type` = '2', `faction` = '35', `data0` = '0', `data3` = '10219', `data22` = '0' WHERE `gameobject_template`.`entry` = 181606;
 
 -- 任务9164
-UPDATE quest_template SET ReqItemCount3 = 0, ReqItemCount4 = 1, ReqCreatureOrGOId3=16209,ReqCreatureOrGOId4=0,ReqCreatureOrGOCount3 = 1, ReqCreatureOrGOCount4 = 0 WHERE entry= 9164;
+UPDATE quest_template SET ReqItemId3 = 0, ReqItemId4 = 22628, ReqItemCount3 = 0, ReqItemCount4 = 1, ReqCreatureOrGOId3=16209,ReqCreatureOrGOId4=0,ReqCreatureOrGOCount3 = 1, ReqCreatureOrGOCount4 = 0 WHERE entry= 9164;
 UPDATE locales_quest lq SET lq.ObjectiveText3_loc4="营救游侠维多兰",lq.ObjectiveText4_loc4=""  WHERE entry = 9164;
 
 -- 任务 10911 刀锋山邪能火炮不能被控制
 UPDATE `creature_template` SET `StaticFlags3` = '0' WHERE `creature_template`.`Entry` = 22443;
 
-
+-- 卡拉赞梦魇门不开的问题
+update tbcmangos.gameobject_template gt set gt.data1 = 0 where gt.entry in  (184274, 184280);
