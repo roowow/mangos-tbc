@@ -56,7 +56,8 @@ bool GossipHello_npc_erozion(Player* pPlayer, Creature* pCreature)
 
     // Need info, should have option to teleport or not
     if (pInstance && pInstance->GetData(TYPE_EPOCH) == DONE)
-        pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, "Take me back to my time.", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+2);
+        // pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, "Take me back to my time.", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+2);
+        pPlayer->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, "让我回到我原来的时空。", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF+2);
 
     pPlayer->SEND_GOSSIP_MENU(TEXT_ID_DEFAULT, pCreature->GetObjectGuid());
 

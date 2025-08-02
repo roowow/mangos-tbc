@@ -157,4 +157,7 @@ UPDATE locales_quest lq SET lq.ObjectiveText3_loc4="营救游侠维多兰",lq.Ob
 -- 任务 10911 刀锋山邪能火炮不能被控制
 UPDATE `creature_template` SET `StaticFlags3` = '0' WHERE `creature_template`.`Entry` = 22443;
 
+-- 任务 4513 在4512完成后npc的事件无法正常完成，导致4513无法接到， 修改方式：去掉npc事件 ，简化为交完4512后可以直接接取4513
+update tbcmangos.quest_template q set q.CompleteScript = 0 where q.entry = 4512;
+
 
