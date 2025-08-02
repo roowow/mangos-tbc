@@ -305,10 +305,28 @@ struct boss_zuljinAI : public CombatAI
             // In Eagle phase we just cast Energy storm and summon 4 Feather cyclones; Boss doesn't move in this phase
             else
             {
-                DoCastSpellIfCan(nullptr, SPELL_ENERGY_STORM, CAST_TRIGGERED);
+                // Force cast SPELL_ENERGY_STORM
+                if (const SpellEntry* spellInfo = sSpellTemplate.LookupEntry<SpellEntry>(SPELL_ENERGY_STORM))
+                {
+                    m_creature->InterruptNonMeleeSpells(false); // Interrupt any ongoing spells
+                    m_creature->CastSpell(nullptr, spellInfo, TRIGGERED_IGNORE_GCD | TRIGGERED_IGNORE_CURRENT_CASTED_SPELL);
+                }
+                else
+                {
+                    sLog.outError("Zuljin failed to find SPELL_ENERGY_STORM (%u)", SPELL_ENERGY_STORM);
+                }
 
-                // summon 4 vortexes
-                DoCastSpellIfCan(nullptr, SPELL_SUMMON_CYCLONE, CAST_TRIGGERED);
+                // Force cast SPELL_SUMMON_CYCLONE
+                if (const SpellEntry* spellInfo = sSpellTemplate.LookupEntry<SpellEntry>(SPELL_SUMMON_CYCLONE))
+                {
+                    m_creature->InterruptNonMeleeSpells(false); // Interrupt any ongoing spells
+                    m_creature->CastSpell(nullptr, spellInfo, TRIGGERED_IGNORE_GCD | TRIGGERED_IGNORE_CURRENT_CASTED_SPELL);
+                }
+                else
+                {
+                    sLog.outError("Zuljin failed to find SPELL_SUMMON_CYCLONE (%u)", SPELL_SUMMON_CYCLONE);
+                    m_creature->SetStunned(false); // Prevent getting stuck in stunned state
+                }
                 m_creature->SetStunned(true);
             }
             HandlePhaseTransition();

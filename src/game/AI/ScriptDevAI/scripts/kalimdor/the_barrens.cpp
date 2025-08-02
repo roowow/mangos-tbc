@@ -948,6 +948,7 @@ public:
         if(m_eventStarted)
             return;
 
+        Reset();
         m_eventStarted         = true;
         m_eventTimer           = 20 * MINUTE * IN_MILLISECONDS;
  
@@ -1059,7 +1060,8 @@ bool GossipHello_npc_regthar_deathgate(Player* player, Creature* creature)
 
     if (player->GetQuestStatus(QUEST_COUNTERATTACK) == QUEST_STATUS_INCOMPLETE)
     {
-        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, "Where is Warlord Krom'zar?", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 1);
+        // player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, "Where is Warlord Krom'zar?", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 1);
+        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, "督军克罗姆扎在哪儿?", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 1);
         player->SEND_GOSSIP_MENU(2533, creature->GetObjectGuid());
         return true;
     }

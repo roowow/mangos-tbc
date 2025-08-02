@@ -590,7 +590,11 @@ void WorldSession::UpdateMap(uint32 diff)
     {
         auto const packet = std::move(recvQueueMapCopy.front());
         recvQueueMapCopy.pop_front();
-
+        if (!packet)
+        {
+            sLog.outError("Null packet encountered in UpdateMap.");
+            continue;
+        }
         OpcodeHandler const& opHandle = opcodeTable[packet->GetOpcode()];
         
         if (opHandle.status == STATUS_LOGGEDIN)
@@ -598,6 +602,7 @@ void WorldSession::UpdateMap(uint32 diff)
             ExecuteOpcode(opHandle, *packet);
         }
     }
+
 }
 
 #ifdef ENABLE_PLAYERBOTS
