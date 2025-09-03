@@ -2886,13 +2886,7 @@ void Spell::EffectDummy(SpellEffectIndex eff_idx)
         return;
     }
 
-    // Script based implementation. Must be used only for not good for implementation in core spell effects
-    // So called only for not processed cases
-    bool libraryResult = false;
-    if (unitTarget && unitTarget->GetTypeId() == TYPEID_UNIT)
-        libraryResult = sScriptDevAIMgr.OnEffectDummy(m_caster, m_spellInfo->Id, eff_idx, (Creature*)unitTarget, m_originalCasterGUID);
-
-    if (libraryResult || (!unitTarget && !gameObjTarget))
+    if (!unitTarget && !gameObjTarget)
         return;
 
     // Previous effect might have started script
@@ -4220,23 +4214,7 @@ void Spell::EffectSummonType(SpellEffectIndex eff_idx)
             {
                 case UNITNAME_SUMMON_TITLE_NONE:
                 {
-                    // those are classical totems - effectbasepoints is their hp and not summon ammount!
-                    // 121: 23035, battlestands
-                    // 647: 52893, Anti-Magic Zone (npc used)
-                    if (prop_id == 121 || prop_id == 647)
-                        summonResult = DoSummonTotem(summonPositions, eff_idx);
-                    else
-                    {
-                        switch (m_spellInfo->Id) // unable to distinguish based on prop_id, therefore spell by spell override
-                        {
-                            case 38544: // summon marmot, gives control of marmot pet
-                                summonResult = DoSummonPossessed(summonPositions, summon_prop, eff_idx, creatureLevel);
-                                break;
-                            default:
-                                summonResult = DoSummonWild(summonPositions, summon_prop, eff_idx, creatureLevel);
-                                break;
-                        }
-                    }
+                    summonResult = DoSummonWild(summonPositions, summon_prop, eff_idx, creatureLevel);
                     break;
                 }
                 case UNITNAME_SUMMON_TITLE_PET:
@@ -4266,11 +4244,7 @@ void Spell::EffectSummonType(SpellEffectIndex eff_idx)
                     summonResult = DoSummonTotem(summonPositions, eff_idx, summon_prop->Slot);
                     break;
                 case UNITNAME_SUMMON_TITLE_COMPANION:
-                    // slot 6 set for critters that can help to player in fighting
-                    if (summon_prop->Slot == SUMMON_PROP_SLOT_QUEST_PLAYERS_ONLY)
-                        summonResult = DoSummonGuardian(summonPositions, summon_prop, eff_idx, creatureLevel);
-                    else
-                        summonResult = DoSummonCritter(summonPositions, summon_prop, eff_idx, creatureLevel);
+                    summonResult = DoSummonCritter(summonPositions, summon_prop, eff_idx, creatureLevel);
                     break;
                 default:
                     sLog.outError("EffectSummonType: Unhandled summon title %u", summon_prop->Title);
@@ -4280,12 +4254,7 @@ void Spell::EffectSummonType(SpellEffectIndex eff_idx)
         }
         case SUMMON_PROP_GROUP_PETS:
         {
-            // 1562 - force of nature  - sid 33831
-            // 1161 - feral spirit - sid 51533
-            if (prop_id == 1562)                            // 3 uncontrolable instead of one controllable :/
-                summonResult = DoSummonGuardian(summonPositions, summon_prop, eff_idx, creatureLevel);
-            else
-                summonResult = DoSummonPet(summonPositions, summon_prop, eff_idx);
+            summonResult = DoSummonPet(summonPositions, summon_prop, eff_idx);
             break;
         }
         case SUMMON_PROP_GROUP_CONTROLLABLE:
@@ -7439,14 +7408,14 @@ bool Spell::DoSummonTotem(CreatureSummonPositions& list, SpellEffectIndex eff_id
         pTotem->SetPvP(true);
 
     // sending SMSG_TOTEM_CREATED before add to map (done in Summon)
-    if (slot < MAX_TOTEM_SLOT && m_caster->GetTypeId() == TYPEID_PLAYER)
+    if (slot < MAX_TOTEM_SLOT && m_caster->IsPlayer())
     {
         WorldPacket data(SMSG_TOTEM_CREATED, 1 + 8 + 4 + 4);
         data << uint8(slot);
         data << pTotem->GetObjectGuid();
         data << uint32(m_duration);
         data << uint32(m_spellInfo->Id);
-        ((Player*)m_caster)->SendDirectMessage(data);
+        static_cast<Player*>(m_caster)->SendDirectMessage(data);
     }
 
     pTotem->Summon(m_caster);
@@ -7672,6 +7641,16 @@ void Spell::EffectSummonObject(SpellEffectIndex eff_idx)
     pGameObj->SetSpellId(m_spellInfo->Id);
     pGameObj->SetSpawnerGuid(m_trueCaster->GetObjectGuid());
     m_caster->AddGameObject(pGameObj);
+
+    if (slot < MAX_TOTEM_SLOT && m_caster->IsPlayer())
+    {
+        WorldPacket data(SMSG_TOTEM_CREATED, 1 + 8 + 4 + 4);
+        data << uint8(slot);
+        data << pGameObj->GetObjectGuid();
+        data << 0; // gos send no extra info
+        data << 0;
+        static_cast<Player*>(m_caster)->SendDirectMessage(data);
+    }
 
     map->Add(pGameObj);
     pGameObj->AIM_Initialize();

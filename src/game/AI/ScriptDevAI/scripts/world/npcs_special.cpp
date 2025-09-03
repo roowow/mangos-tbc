@@ -1227,20 +1227,18 @@ UnitAI* GetAI_npc_redemption_target(Creature* pCreature)
     return new npc_redemption_targetAI(pCreature);
 }
 
-bool EffectDummyCreature_npc_redemption_target(Unit* pCaster, uint32 uiSpellId, SpellEffectIndex uiEffIndex, Creature* pCreatureTarget, ObjectGuid /*originalCasterGuid*/)
+// 8593 - Symbol of Life
+// 31225 - Shimmering Vessel
+struct PaladinQuestReviveSelf : public SpellScript
 {
-    // always check spellid and effectindex
-    if ((uiSpellId == SPELL_SYMBOL_OF_LIFE || uiSpellId == SPELL_SHIMMERING_VESSEL) && uiEffIndex == EFFECT_INDEX_0)
+    void OnEffectExecute(Spell* spell, SpellEffectIndex /*effIdx*/) const override
     {
-        if (npc_redemption_targetAI* pTargetAI = dynamic_cast<npc_redemption_targetAI*>(pCreatureTarget->AI()))
-            pTargetAI->DoReviveSelf(pCaster->GetObjectGuid());
-
-        // always return true when we are handling this spell and effect
-        return true;
+        Unit* caster = spell->GetCaster();
+        Unit* target = spell->GetUnitTarget();
+        if (npc_redemption_targetAI* pTargetAI = dynamic_cast<npc_redemption_targetAI*>(target->AI()))
+            pTargetAI->DoReviveSelf(caster->GetObjectGuid());
     }
-
-    return false;
-}
+};
 
 /*######
 ## npc_burster_worm
@@ -1754,7 +1752,7 @@ enum
     SPELL_MIND_NUMBING_POISON   = 25810,
     SPELL_CRIPPLING_POISON      = 25809,
 
-    // SPELL_RANDOM_AGGRO = 34701 // unk purpose
+    SPELL_RANDOM_AGGRO = 34701,
 };
 
 struct npc_snakesAI : public ScriptedAI
@@ -1769,6 +1767,7 @@ struct npc_snakesAI : public ScriptedAI
         m_creature->GetMotionMaster()->Clear();
         m_creature->GetMotionMaster()->MoveRandomAroundPoint(m_creature->GetPositionX(), m_creature->GetPositionY(), m_creature->GetPositionZ(), 5.f);
         DoCastSpellIfCan(nullptr, SPELL_DEADLY_POISON_PASSIVE, CAST_AURA_NOT_PRESENT | CAST_TRIGGERED);
+        DoCastSpellIfCan(nullptr, SPELL_RANDOM_AGGRO, CAST_TRIGGERED);
     }
 
     void UpdateAI(const uint32 diff) override
@@ -2876,7 +2875,6 @@ void AddSC_npcs_special()
     pNewScript = new Script;
     pNewScript->Name = "npc_redemption_target";
     pNewScript->GetAI = &GetAI_npc_redemption_target;
-    pNewScript->pEffectDummyNPC = &EffectDummyCreature_npc_redemption_target;
     pNewScript->RegisterSelf();
 
     pNewScript = new Script;
@@ -2950,6 +2948,7 @@ void AddSC_npcs_special()
     pNewScript->pGossipHello = &GossipHello_npc_gossip_npc;
     pNewScript->RegisterSelf();
 
+    RegisterSpellScript<PaladinQuestReviveSelf>("spell_paladin_quest_revive_self");
     RegisterSpellScript<HarvestSilithidEgg>("spell_harvest_silithid_egg");
     RegisterSpellScript<ImpInABottleSay>("spell_imp_in_a_bottle_say");
     RegisterSpellScript<GossipNPCPeriodicTriggerFidget>("spell_gossip_npc_periodic_trigger_fidget");
