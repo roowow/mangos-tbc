@@ -28,7 +28,13 @@ void WorldSession::HandleLearnTalentOpcode(WorldPacket& recv_data)
     uint32 talent_id, requested_rank;
     recv_data >> talent_id >> requested_rank;
 
-    _player->LearnTalent(talent_id, requested_rank);
+    // _player->LearnTalent(talent_id, requested_rank);
+    if (_player->LearnTalent(talent_id, requested_rank))
+    {
+        // DualTalent
+        if (_player->oowowInfo.activeTalent)
+            CharacterDatabase.PExecute("INSERT INTO `character_spell_tmp` (`ID`, `TalentID`, `Rank`, `Guid`, `Flag`, `Changed`) VALUES (NULL, %u, %u, %u, %u, UNIX_TIMESTAMP())", talent_id, requested_rank, _player->GetGUIDLow(), _player->oowowInfo.activeTalent);
+    }
 
     // if player has a pet, update owner talent auras
     if (_player->GetPet())
@@ -58,6 +64,12 @@ void WorldSession::HandleTalentWipeConfirmOpcode(WorldPacket& recv_data)
         data << uint32(0);
         SendPacket(data);
         return;
+    }
+    else
+    {
+        // DualTalent
+        CharacterDatabase.PExecute("DELETE FROM character_spell_extra WHERE guid = %u and flag = %u", _player->GetGUIDLow(), _player->ActiveTalent());
+        CharacterDatabase.PExecute("DELETE FROM character_spell_tmp   WHERE guid = %u and flag = %u", _player->GetGUIDLow(), _player->ActiveTalent());
     }
 
     unit->CastSpell(_player, 14867, TRIGGERED_OLD_TRIGGERED);                  // spell: "Untalent Visual Effect"
