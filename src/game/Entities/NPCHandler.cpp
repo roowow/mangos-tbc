@@ -379,6 +379,49 @@ void WorldSession::HandleGossipSelectOptionOpcode(WorldPacket& recv_data)
         if (!sScriptDevAIMgr.OnGossipSelect(_player, pGo, sender, action, code.empty() ? nullptr : code.c_str()))
             _player->OnGossipSelect(pGo, gossipListId, menuId);
     }
+    else if (guid.IsItem())
+    {
+        // DualTalent 魂器 34646
+        std::string tname;
+        Item* item = GetPlayer()->GetItemByGuid(guid);
+        if (item && item->GetEntry() == 34646)
+        {
+            PlayerMenu* pMenu = _player->GetPlayerMenu();
+            pMenu->ClearMenus();
+
+            switch (action)
+            {
+                case 1 ... 19:
+                    pMenu->GetGossipMenu().AddMenuItem(2, "切换灵魂", 1, 200+action, "确定切换灵魂", 0, 0);
+                    // pMenu->GetGossipMenu().AddMenuItem(9, "忘记灵魂", 2, 300+action, "确定忘记灵魂", 0, 0);
+                    pMenu->SendGossipMenu(22012, guid);
+                    break;
+                // case 20:
+                //     pMenu->GetGossipMenu().AddMenuItem(1, "分裂灵魂", 2, 21, "输入灵魂标签", 0, 1);
+                //     pMenu->GetGossipMenu().AddMenuItem(9, "关闭", 1, 999, "", 0, 0);
+                //     pMenu->SendGossipMenu(22012, guid);
+                //     break;
+                case 21:
+                    if (code.empty() || code.length() > 20)
+                        break;
+
+                    _player->AddTalent(code);
+                    pMenu->CloseGossip();
+                    break;
+                case 200 ... 219:
+                    _player->SwitchTalent(action-200);
+                    pMenu->CloseGossip();
+                    break;
+                case 300 ... 319:
+                    _player->DeleteTalent(action-300);
+                    pMenu->CloseGossip();
+                    break;
+                case 999:
+                    pMenu->CloseGossip();
+                    break;
+            }
+        }
+    }
 }
 
 void WorldSession::HandleSpiritHealerActivateOpcode(WorldPacket& recv_data)
