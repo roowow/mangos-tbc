@@ -2236,6 +2236,7 @@ bool Player::TeleportTo(uint32 mapid, float x, float y, float z, float orientati
         else                                                // !map->CanEnter(this)
             return false;
     }
+
     return true;
 }
 
@@ -20494,7 +20495,15 @@ void Player::RewardSinglePlayerAtKill(Unit* pVictim)
     {
         Creature* creatureVictim = static_cast<Creature*>(pVictim);
         RewardReputation(creatureVictim, 1);
-        GiveXP(MaNGOS::XP::Gain(this, creatureVictim), creatureVictim);
+        // 双倍经验 7337 磐石
+        if (HasItemCount(7337, 1))
+        {
+            GiveXP(MaNGOS::XP::Gain(this, creatureVictim)*2, creatureVictim);
+        }
+        else
+        {
+            GiveXP(MaNGOS::XP::Gain(this, creatureVictim), creatureVictim);
+        }
 
         if (Pet* pet = GetPet())
             pet->GivePetXP(MaNGOS::XP::Gain(pet, creatureVictim));
