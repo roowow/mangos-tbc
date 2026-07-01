@@ -54,7 +54,7 @@ Pet::Pet(PetType type) :
     m_removed(false), m_happinessTimer(7500), m_loyaltyTimer(12000), m_petType(type), m_duration(0),
     m_loyaltyPoints(0), m_loading(false),
     m_xpRequiredForNextLoyaltyLevel(0), m_declinedname(nullptr),
-    m_petModeFlags(PET_MODE_DEFAULT), m_originalCharminfo(nullptr), m_inStatsUpdate(false)
+    m_petModeFlags(PET_MODE_DEFAULT), m_originalCharminfo(nullptr), m_inStatsUpdate(false), m_scaleWithCls(false)
 {
     m_name = "Pet";
 
@@ -1214,9 +1214,9 @@ bool Pet::CreateBaseAtCreature(Creature* creature)
     SetByteValue(UNIT_FIELD_BYTES_0, UNIT_BYTES_0_OFFSET_POWER_TYPE, POWER_FOCUS);
     SetSheath(SHEATH_STATE_MELEE);
 
-    // SetByteFlag(UNIT_FIELD_BYTES_2, 2, UNIT_CAN_BE_RENAMED | UNIT_CAN_BE_ABANDONED); (need to test and check these for vanilla and TBC)
+    SetByteFlag(UNIT_FIELD_BYTES_2, 2, UNIT_CAN_BE_RENAMED);
 
-    SetUInt32Value(UNIT_FIELD_FLAGS, UNIT_FLAG_PLAYER_CONTROLLED | UNIT_FLAG_RENAME);
+    SetUInt32Value(UNIT_FIELD_FLAGS, UNIT_FLAG_PLAYER_CONTROLLED);
     SetByteValue(UNIT_FIELD_BYTES_2, UNIT_BYTES_2_OFFSET_DEBUFF_LIMIT, UNIT_BYTE2_PLAYER_CONTROLLED_DEBUFF_LIMIT);
 
     SetUInt32Value(UNIT_MOD_CAST_SPEED, creature->GetUInt32Value(UNIT_MOD_CAST_SPEED));
@@ -1326,8 +1326,6 @@ void Pet::InitStatsForLevel(uint32 petlevel)
                 SetBaseWeaponDamage(BASE_ATTACK, MAXDAMAGE, 1);
             }
 
-
-
             break;
         }
 
@@ -1390,6 +1388,7 @@ void Pet::InitStatsForLevel(uint32 petlevel)
         }
         case GUARDIAN_PET:
         {
+            m_scaleWithCls = true;
             SelectLevel(petlevel);  // guardians reuse CLS function SelectLevel, so we stop here
             InitPetScalingAuras();
             return;
@@ -1531,7 +1530,7 @@ bool Pet::HaveInDiet(ItemPrototype const* item) const
         return false;
 
     const uint32 diet = cFamily->petFoodMask;
-    const uint32 FoodMask = 1 << (item->FoodType - 1);
+    const uint32 FoodMask = convertEnumToFlag(item->FoodType);
     return (diet & FoodMask) != 0;
 }
 

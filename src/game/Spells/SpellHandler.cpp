@@ -195,8 +195,6 @@ void WorldSession::HandleUseItemOpcode(WorldPacket& recvPacket)
         return;
     }
 
-    _player->RemoveAurasWithInterruptFlags(AURA_INTERRUPT_FLAG_ITEM_USE);
-
     // Note: If script stop casting it must send appropriate data to client to prevent stuck item in gray state.
     if (!sScriptDevAIMgr.OnItemUse(pUser, pItem, targets))
     {
@@ -525,7 +523,7 @@ void WorldSession::HandleCancelAuraOpcode(WorldPacket& recvPacket)
     if (spellInfo->HasAttribute(SPELL_ATTR_NO_AURA_CANCEL))
         return;
 
-    if (spellInfo->HasAttribute(SPELL_ATTR_EX_NO_AURA_ICON))
+    if (spellInfo->HasAttribute(SPELL_ATTR_EX_NO_AURA_ICON) && !IsSpellHaveAura(spellInfo, SPELL_AURA_TRACK_RESOURCES))
         return;
 
     if (IsPassiveSpell(spellInfo))

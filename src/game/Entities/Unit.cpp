@@ -576,10 +576,12 @@ void Unit::TriggerAggroLinkingEvent(Unit* enemy)
     if (!IsCreature() || !enemy)
         return;
 
-    m_events.AddEvent(new UnitLambdaEvent(*this, [enemyGuid = enemy->GetObjectGuid(), creatureGroup = static_cast<Creature*>(this)->GetCreatureGroup()](Unit& unit)
+    bool callAssistance = static_cast<Creature*>(this)->MarkCallAssistanceOnPull();
+
+    m_events.AddEvent(new UnitLambdaEvent(*this, [enemyGuid = enemy->GetObjectGuid(), creatureGroup = static_cast<Creature*>(this)->GetCreatureGroup(), callAssistance](Unit& unit)
     {
         Unit* enemy = unit.GetMap()->GetUnit(enemyGuid);
-        if (!enemy)
+        if (!enemy || !unit.IsInCombat())
             return;
 
         if (unit.IsLinkingEventTrigger())
@@ -587,11 +589,17 @@ void Unit::TriggerAggroLinkingEvent(Unit* enemy)
 
         if (creatureGroup) // if npc dies before event execution, group will be removed from him, however groups are persistent and safe to access like this
             creatureGroup->TriggerLinkingEvent(CREATURE_GROUP_EVENT_AGGRO, enemy);
+
+        if (callAssistance)
+            static_cast<Creature&>(unit).CallAssistanceOnPull(enemy);
     }), m_events.CalculateTime(sWorld.getConfig(CONFIG_UINT32_CREATURE_CHECK_FOR_HELP_AGGRO_DELAY)));
 }
 
 void Unit::TriggerEvadeEvents()
 {
+    if (!IsPlayerControlled())
+        SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_EVADING_HOME);
+
     static_cast<Creature*>(this)->SetLootRecipient(nullptr);
 
     if (InstanceData* mapInstance = GetInstanceData())
@@ -608,6 +616,8 @@ void Unit::TriggerEvadeEvents()
 
 void Unit::TriggerHomeEvents()
 {
+    RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_EVADING_HOME);
+
     AI()->JustReachedHome();
 
     if (!hasUnitState(UNIT_STAT_NO_FOLLOW_MOVEMENT))
@@ -976,7 +986,7 @@ uint32 Unit::DealDamage(Unit* dealer, Unit* victim, uint32 damage, CleanDamage c
             actionInterruptFlags = (actionInterruptFlags | AURA_INTERRUPT_FLAG_NON_PERIODIC_DAMAGE);
 
         SpellAuraHolderMap& vInterrupts = victim->GetSpellAuraHolderMap();
-        std::vector<uint32> cleanupHolder;
+        std::vector<std::pair<uint32, bool>> cleanupHolder;
 
         for (auto& aura : vInterrupts)
         {
@@ -994,11 +1004,30 @@ uint32 Unit::DealDamage(Unit* dealer, Unit* victim, uint32 damage, CleanDamage c
                     continue;
 
             if (se->AuraInterruptFlags & actionInterruptFlags)
-                cleanupHolder.push_back(aura.second->GetId());
+                cleanupHolder.emplace_back(aura.second->GetId(), aura.second->IsPositive());
         }
 
-        for (auto aura : cleanupHolder)
-            victim->RemoveAurasDueToSpell(aura);
+        if (!cleanupHolder.empty())
+        {
+            WorldPacket data(SMSG_SPELLBREAKLOG, 8 + 8 + 4 + 1 + 4 + 1 * 5);
+            data << victim->GetPackGUID();          // Victim GUID
+            if (dealer)                             // Caster GUID
+                data << dealer->GetPackGUID();
+            else
+                data << PackedGuid();
+            data << uint32(spellInfo != nullptr ? spellInfo->Id : 0); // breaking spell id
+            data << uint8(0);                       // not used
+            data << uint32(cleanupHolder.size());   // count
+
+            for (std::pair<uint32, uint32> aura : cleanupHolder)
+            {
+                data << uint32(aura.first); // Spell Id
+                data << uint8(!aura.second); // buff / debuff
+                victim->RemoveAurasDueToSpell(aura.first);
+            }
+
+            victim->SendMessageToSet(data, true);
+        }
 
         if (Spell* spell = victim->GetCurrentSpell(CURRENT_CHANNELED_SPELL))
             if (spell->m_spellInfo->ChannelInterruptFlags & actionInterruptFlags)
@@ -1283,7 +1312,7 @@ void Unit::HandleDamageDealt(Unit* dealer, Unit* victim, uint32& damage, CleanDa
         {
             float threat = damage * sSpellMgr.GetSpellThreatMultiplier(spellProto);
             victim->AddThreat(dealer, threat, (cleanDamage && cleanDamage->hitOutCome == MELEE_HIT_CRIT), damageSchoolMask, spellProto);
-            if (damagetype != DOT && damagetype != SPELL_DAMAGE_SHIELD) // DOTs dont put in combat but still cause threat
+            if (damagetype != DOT && damagetype != SPELL_DAMAGE_SHIELD && (!spellProto || !spellProto->HasAttribute(SPELL_ATTR_EX4_REACTIVE_DAMAGE_PROC))) // DOTs dont put in combat but still cause threat
             {
                 dealer->SetInCombatWith(victim);
                 victim->SetInCombatWith(dealer);
@@ -1565,8 +1594,16 @@ SpellCastResult Unit::CastSpell(Unit* Victim, SpellEntry const* spellInfo, uint3
     SpellCastTargets targets;
     targets.setUnitTarget(Victim);
 
-    if (spellInfo->Targets & TARGET_FLAG_DEST_LOCATION)
-        targets.setDestination(Victim->GetPositionX(), Victim->GetPositionY(), Victim->GetPositionZ());
+    if ((spellInfo->Targets & TARGET_FLAG_DEST_LOCATION))
+    {
+        // This shouldn't happen, but we should return gracefully if it does...
+        if (!Victim)
+        {
+            sLog.outError("CastSpell: victim was nullptr but tried to get position: caster %s, spellId %i", GetGuidStr().c_str(), spellInfo->Id);
+            return SPELL_FAILED_BAD_TARGETS;
+        }    
+        targets.setDestination(Victim->GetPositionX(), Victim->GetPositionY(), Victim->GetPositionZ()); 
+    }
     if (spellInfo->Targets & TARGET_FLAG_SOURCE_LOCATION)
         if (WorldObject* caster = spell->GetCastingObject())
             targets.setSource(caster->GetPositionX(), caster->GetPositionY(), caster->GetPositionZ());
@@ -6799,9 +6836,9 @@ void Unit::ModifyAuraState(AuraState flag, bool apply)
 {
     if (apply)
     {
-        if (!HasFlag(UNIT_FIELD_AURASTATE, 1 << (flag - 1)))
+        if (!HasFlag(UNIT_FIELD_AURASTATE, convertEnumToFlag(flag)))
         {
-            SetFlag(UNIT_FIELD_AURASTATE, 1 << (flag - 1));
+            SetFlag(UNIT_FIELD_AURASTATE, convertEnumToFlag(flag));
             if (GetTypeId() == TYPEID_PLAYER)
             {
                 const PlayerSpellMap& sp_list = ((Player*)this)->GetSpellMap();
@@ -6818,9 +6855,9 @@ void Unit::ModifyAuraState(AuraState flag, bool apply)
     }
     else
     {
-        if (HasFlag(UNIT_FIELD_AURASTATE, 1 << (flag - 1)))
+        if (HasFlag(UNIT_FIELD_AURASTATE, convertEnumToFlag(flag)))
         {
-            RemoveFlag(UNIT_FIELD_AURASTATE, 1 << (flag - 1));
+            RemoveFlag(UNIT_FIELD_AURASTATE, convertEnumToFlag(flag));
 
             Unit::SpellAuraHolderMap& tAuras = GetSpellAuraHolderMap();
             for (Unit::SpellAuraHolderMap::iterator itr = tAuras.begin(); itr != tAuras.end();)
@@ -7794,7 +7831,7 @@ bool Unit::IsImmuneToSpell(SpellEntry const* spellInfo, bool /*castOnSelf*/, uin
 
         AuraList const& immuneAuraApply = GetAurasByType(SPELL_AURA_MECHANIC_IMMUNITY_MASK);
         for (auto iter : immuneAuraApply)
-            if (iter->GetModifier()->m_miscvalue & (1 << (mechanic - 1)))
+            if (iter->GetModifier()->m_miscvalue & (convertEnumToFlag(mechanic)))
                 return true;
     }
 
@@ -7822,7 +7859,7 @@ bool Unit::IsImmuneToSpellEffect(SpellEntry const* spellInfo, SpellEffectIndex i
 
         AuraList const& immuneAuraApply = GetAurasByType(SPELL_AURA_MECHANIC_IMMUNITY_MASK);
         for (auto iter : immuneAuraApply)
-            if (iter->GetModifier()->m_miscvalue & (1 << (mechanic - 1)))
+            if (iter->GetModifier()->m_miscvalue & convertEnumToFlag(mechanic))
                 return true;
     }
 
@@ -8407,8 +8444,6 @@ void Unit::SetInCombatState(bool PvP, Unit* enemy)
         if (InstanceData* mapInstance = GetInstanceData())
             mapInstance->OnCreatureEnterCombat(creature);
 
-        creature->CallAssistance(enemy);
-
         creature->SetCanCheckForHelp(false);
         creature->m_events.AddEvent(new UnitLambdaEvent(*creature, [](Unit& unit)
         {
@@ -8952,7 +8987,7 @@ void Unit::SetSpeedRate(UnitMoveType mtype, float rate, bool forced)
             data << GetPackGUID();
             data << counter;
             if (mtype == MOVE_RUN)
-                data << uint8(0);                           // new 2.1.0
+                data << uint8(0); // new 2.1.0 - update tracking run speed
             data << GetSpeed(mtype);
             player->GetSession()->SendPacket(data);
             player->GetSession()->GetAnticheat()->OrderSent(data.GetOpcode(), counter);
@@ -8986,6 +9021,7 @@ void Unit::SetDeathState(DeathState s)
             i_motionMaster.MoveIdle();
 
         GetCombatManager().StopEvade();
+        RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_EVADING_HOME);
 
         ModifyAuraState(AURA_STATE_HEALTHLESS_20_PERCENT, false);
         ModifyAuraState(AURA_STATE_HEALTHLESS_35_PERCENT, false);
@@ -9259,7 +9295,7 @@ int32 Unit::CalculateAuraDuration(SpellEntry const* spellInfo, uint32 effectMask
 
     for (int32 mechanic = FIRST_MECHANIC; mechanic < MAX_MECHANIC; ++mechanic)
     {
-        if (!(mechanicMask & (1 << (mechanic - 1))))
+        if (!(mechanicMask & convertEnumToFlag(mechanic)))
             continue;
 
         int32 stackingMod = GetTotalAuraModifierByMiscValue(SPELL_AURA_MECHANIC_DURATION_MOD, mechanic);
@@ -11895,8 +11931,6 @@ bool Unit::TakeCharmOf(Unit* charmed, uint32 spellId, bool advertised /*= true*/
 
     CharmInfo* charmInfo = charmed->InitCharmInfo(charmed);
 
-    bool isPossessCharm = IsPossessCharmType(spellId);
-
     Position combatStartPosition;
 
     if (charmed->IsPlayer())
@@ -11909,15 +11943,10 @@ bool Unit::TakeCharmOf(Unit* charmed, uint32 spellId, bool advertised /*= true*/
 
         charmInfo->SetCharmState("PetAI");
 
-        if (isPossessCharm)
-            charmInfo->InitPossessCreateSpells();
-        else
-        {
-            charmInfo->InitCharmCreateSpells();
-            charmed->AI()->SetReactState(REACT_DEFENSIVE);
-            charmInfo->SetCommandState(COMMAND_FOLLOW);
-            charmInfo->SetIsRetreating(true);
-        }
+        charmInfo->InitCharmCreateSpells();
+        charmed->AI()->SetReactState(REACT_DEFENSIVE);
+        charmInfo->SetCommandState(COMMAND_FOLLOW);
+        charmInfo->SetIsRetreating(true);
 
         charmedPlayer->ClearSelectionGuid();
 
@@ -11929,10 +11958,8 @@ bool Unit::TakeCharmOf(Unit* charmed, uint32 spellId, bool advertised /*= true*/
 
         charmedCreature->GetCombatStartPosition(combatStartPosition);
 
-        if (charmed->AI() && charmed->AI()->CanHandleCharm())
-            charmInfo->SetCharmState("", false);
-        else
-            charmInfo->SetCharmState("PetAI");
+        bool changeAI = !static_cast<Creature*>(charmed)->GetSettings().HasFlag(CreatureStaticFlags2::ACTION_TRIGGERS_WHILE_CHARMED);
+        charmInfo->SetCharmState(changeAI ? "PetAI" : "", changeAI);
 
         charmedCreature->SetWalk(IsWalking(), true);
 
@@ -11943,11 +11970,9 @@ bool Unit::TakeCharmOf(Unit* charmed, uint32 spellId, bool advertised /*= true*/
         if (uint32 charmedSpellList = charmedCreature->GetCreatureInfo()->CharmedSpellList)
             charmedCreature->SetSpellList(charmedSpellList);
 
-        if (isPossessCharm)
-            charmInfo->InitPossessCreateSpells();
-        else
+        charmInfo->InitCharmCreateSpells();
+        if (changeAI)
         {
-            charmInfo->InitCharmCreateSpells();
             charmed->AI()->SetReactState(REACT_DEFENSIVE);
             charmInfo->SetCommandState(COMMAND_FOLLOW);
             charmInfo->SetIsRetreating(true);
@@ -12097,11 +12122,13 @@ void Unit::Uncharm(Unit* charmed, uint32 spellId)
     else
         m_charmedUnitsPrivate.erase(charmedGuid);
 
+    bool changeAI = charmed->IsCreature() && static_cast<Creature*>(charmed)->GetSettings().HasFlag(CreatureStaticFlags2::ACTION_TRIGGERS_WHILE_CHARMED);
+
     // Update movement of the victim
     // Update crowd controlled movement if required:
     // TODO: requires motionmster upgrade for proper handling past this line
     // We are effectively rebuilding motion master contents: confused > fleeing > panic
-    if (!IsPossessCharmType(spellId))
+    if (changeAI)
     {
         const bool panic = charmed->IsInPanic(), fleeing = charmed->IsFleeing(), confused = charmed->IsConfused();
 

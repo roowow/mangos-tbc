@@ -398,7 +398,7 @@ SpellCastResult GetErrorAtShapeshiftedCast(SpellEntry const* spellInfo, uint32 f
             (spellInfo->Effect[EFFECT_INDEX_0] == SPELL_EFFECT_LEARN_SPELL || spellInfo->Effect[EFFECT_INDEX_1] == SPELL_EFFECT_LEARN_SPELL || spellInfo->Effect[EFFECT_INDEX_2] == SPELL_EFFECT_LEARN_SPELL))
         return SPELL_CAST_OK;
 
-    uint32 stanceMask = (form ? 1 << (form - 1) : 0);
+    uint32 stanceMask = (form ? convertEnumToFlag(form) : 0);
 
     if (stanceMask & spellInfo->StancesNot)                 // can explicitly not be casted in this stance
         return SPELL_FAILED_NOT_SHAPESHIFT;
@@ -1021,7 +1021,7 @@ struct DoSpellThreat
 
         // flat threat bonus and attack power bonus currently only work properly when all
         // effects have same targets, otherwise, we'd need to separate it by effect index
-        if (ste.threat || ste.ap_bonus != 0.f)
+        if (ste.inverseEffectMask == 0 && (ste.threat || ste.ap_bonus != 0.f))
         {
             const uint32* targetA = spell->EffectImplicitTargetA;
 
@@ -1038,7 +1038,7 @@ struct DoSpellThreat
                 }
             }
             if (failed)
-                sLog.outErrorDb("Spell %u listed in `spell_threat` has effects with different targets, threat may be assigned incorrectly", spell->Id);
+                sLog.outErrorDb("Spell %u listed in `spell_threat` has effects with different targets, threat may be assigned incorrectly. Consider using inverse effect mask.", spell->Id);
         }
         ++count;
     }
@@ -1054,8 +1054,8 @@ void SpellMgr::LoadSpellThreats()
 {
     mSpellThreatMap.clear();                                // need for reload case
 
-    //                                             0      1       2           3
-    auto queryResult = WorldDatabase.Query("SELECT entry, Threat, multiplier, ap_bonus FROM spell_threat");
+    //                                             0      1       2           3         4
+    auto queryResult = WorldDatabase.Query("SELECT entry, Threat, multiplier, ap_bonus, InverseEffectMask FROM spell_threat");
     if (!queryResult)
     {
         BarGoLink bar(1);
@@ -1081,6 +1081,7 @@ void SpellMgr::LoadSpellThreats()
         ste.threat = fields[1].GetUInt16();
         ste.multiplier = fields[2].GetFloat();
         ste.ap_bonus = fields[3].GetFloat();
+        ste.inverseEffectMask = fields[4].GetUInt32();
 
         rankHelper.RecordRank(ste, entry);
     }
@@ -2310,6 +2311,17 @@ SpellCastResult SpellMgr::GetSpellAllowedInLocationError(SpellEntry const* spell
             return SPELL_FAILED_REQUIRES_AREA;
     }
 
+    if (spellInfo->HasAttribute(SPELL_ATTR_EX_SPECIAL_SKILLUP)) // only fishing currently
+    {
+        // epl works - 227
+        // also meant to be used for vanilla zones but no data on that yet
+        uint32 fishingSkill = player->GetSkillValue(SKILL_FISHING);
+        uint32 v_map = GetVirtualMapForMapAndZone(map_id, zone_id);
+        MapEntry const* mapEntry = sMapStore.LookupEntry(v_map);
+        if (mapEntry && mapEntry->addon >= 1 && fishingSkill < 300)
+            return SPELL_FAILED_LOW_CASTLEVEL;
+    }
+
     // raid instance limitation
     if (spellInfo->HasAttribute(SPELL_ATTR_EX6_NOT_IN_RAID_INSTANCES))
     {
@@ -2783,27 +2795,27 @@ DiminishingGroup GetDiminishingReturnsGroupForSpell(SpellEntry const* spellproto
     if (!mechanic)
         return DIMINISHING_NONE;
 
-    if (mechanic & (1 << (MECHANIC_STUN - 1)))
+    if (mechanic & convertEnumToFlag(MECHANIC_STUN))
         return triggered ? DIMINISHING_TRIGGER_STUN : DIMINISHING_CONTROL_STUN;
-    if (mechanic & (1 << (MECHANIC_SLEEP - 1)))
+    if (mechanic & convertEnumToFlag(MECHANIC_SLEEP))
         return DIMINISHING_SLEEP;
-    if (mechanic & ((1 << (MECHANIC_KNOCKOUT - 1)) | (1 << (MECHANIC_SAPPED - 1)) | (1 << (MECHANIC_POLYMORPH - 1))))
+    if (mechanic & convertEnumToFlag(MECHANIC_KNOCKOUT, MECHANIC_SAPPED, MECHANIC_POLYMORPH))
         return DIMINISHING_KNOCKOUT_POLYMORPH_SAPPED;
-    if (mechanic & (1 << (MECHANIC_ROOT - 1)))
+    if (mechanic & convertEnumToFlag(MECHANIC_ROOT))
         return triggered ? DIMINISHING_TRIGGER_ROOT : DIMINISHING_CONTROL_ROOT;
-    if (mechanic & (1 << (MECHANIC_FEAR - 1)))
+    if (mechanic & convertEnumToFlag(MECHANIC_FEAR))
         return DIMINISHING_FEAR;
-    if (mechanic & (1 << (MECHANIC_CHARM - 1)))
+    if (mechanic & convertEnumToFlag(MECHANIC_CHARM))
         return DIMINISHING_CHARM;
-    //if (mechanic & (1 << (MECHANIC_SILENCE - 1)))
+    //if (mechanic & convertEnumToFlag(MECHANIC_SILENCE))
     //    return DIMINISHING_SILENCE;
-    if (mechanic & (1 << (MECHANIC_DISARM - 1)))
+    if (mechanic & convertEnumToFlag(MECHANIC_DISARM))
         return DIMINISHING_DISARM;
-    if (mechanic & (1 << (MECHANIC_FREEZE - 1)))
+    if (mechanic & convertEnumToFlag(MECHANIC_FREEZE))
         return DIMINISHING_FREEZE;
-    if (mechanic & (1 << (MECHANIC_BANISH - 1)))
+    if (mechanic & convertEnumToFlag(MECHANIC_BANISH))
         return DIMINISHING_BANISH;
-    if (mechanic & (1 << (MECHANIC_HORROR - 1)))
+    if (mechanic & convertEnumToFlag(MECHANIC_HORROR))
         return DIMINISHING_DEATHCOIL;
 
     return DIMINISHING_NONE;

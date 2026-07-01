@@ -478,7 +478,7 @@ enum UnitFlags
     UNIT_FLAG_SPAWNING              = 0x00000002,           // Spawning in - other uses are wrong
     UNIT_FLAG_CLIENT_CONTROL_LOST   = 0x00000004,           // Generic unspecified loss of control initiated by server script, movement checks disabled, paired with loss of client control packet.
     UNIT_FLAG_PLAYER_CONTROLLED     = 0x00000008,           // players, pets, totems, guardians, companions, charms, any units associated with players
-    UNIT_FLAG_RENAME                = 0x00000010,
+    UNIT_FLAG_EVADING_HOME          = 0x00000010,           // TBC+ unsure what version, used in CG_Unit_C::CanSwim
     UNIT_FLAG_PREPARATION           = 0x00000020,           // don't take reagents for spells with SPELL_ATTR_EX5_NO_REAGENT_WHILE_PREP
     UNIT_FLAG_UNK_6                 = 0x00000040,
     UNIT_FLAG_NOT_ATTACKABLE_1      = 0x00000080,           // ?? (UNIT_FLAG_PVP_ATTACKABLE | UNIT_FLAG_NOT_ATTACKABLE_1) is NON_PVP_ATTACKABLE
@@ -1344,9 +1344,9 @@ class Unit : public WorldObject
 
         uint32 GetLevel() const override { return GetUInt32Value(UNIT_FIELD_LEVEL); }
         uint8 getRace() const { return GetByteValue(UNIT_FIELD_BYTES_0, UNIT_BYTES_0_OFFSET_RACE); }
-        uint32 getRaceMask() const { return 1 << (getRace() - 1); }
+        uint32 getRaceMask() const { return convertEnumToFlag(getRace()); }
         uint8 getClass() const { return GetByteValue(UNIT_FIELD_BYTES_0, UNIT_BYTES_0_OFFSET_CLASS); }
-        uint32 getClassMask() const { return 1 << (getClass() - 1); }
+        uint32 getClassMask() const { return convertEnumToFlag(getClass()); }
         uint8 getGender() const { return GetByteValue(UNIT_FIELD_BYTES_0, UNIT_BYTES_0_OFFSET_GENDER); }
 
         float GetStat(Stats stat) const { return float(GetUInt32Value(UNIT_FIELD_STAT0 + stat)); }
@@ -1465,7 +1465,7 @@ class Unit : public WorldObject
         uint32 GetCreatureTypeMask() const
         {
             uint32 creatureType = GetCreatureType();
-            return (creatureType >= 1) ? (1 << (creatureType - 1)) : 0;
+            return (creatureType >= 1) ? convertEnumToFlag(creatureType) : 0;
         }
 
         uint8 getStandState() const { return GetByteValue(UNIT_FIELD_BYTES_1, UNIT_BYTES_1_OFFSET_STAND_STATE); }
@@ -2221,7 +2221,7 @@ class Unit : public WorldObject
         float CalculateDamage(WeaponAttackType attType, bool normalized, uint8 index = 0);
         float GetAPMultiplier(WeaponAttackType attType, bool normalized);
         void ModifyAuraState(AuraState flag, bool apply);
-        bool HasAuraState(AuraState flag) const { return HasFlag(UNIT_FIELD_AURASTATE, 1 << (flag - 1)); }
+        bool HasAuraState(AuraState flag) const { return HasFlag(UNIT_FIELD_AURASTATE, convertEnumToFlag(flag)); }
         bool HasAuraStateForCaster(AuraState flag, ObjectGuid casterGuid) const;
         void UnsummonAllTotems() const;
         Unit* SelectMagnetTarget(Unit* victim, Spell* spell = nullptr);

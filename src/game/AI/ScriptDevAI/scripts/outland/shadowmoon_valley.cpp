@@ -75,6 +75,7 @@ struct mob_mature_netherwing_drakeAI : public ScriptedAI
 
     void Reset() override
     {
+        SetReactState(REACT_DEFENSIVE);
         m_playerGuid.Clear();
 
         m_uiEatTimer    = 0;
@@ -91,7 +92,7 @@ struct mob_mature_netherwing_drakeAI : public ScriptedAI
         if (pCaster->GetTypeId() == TYPEID_PLAYER && pSpell->Id == SPELL_PLACE_CARCASS && !m_creature->HasAura(SPELL_JUST_EATEN))
         {
             m_playerGuid = pCaster->GetObjectGuid();
-            m_uiEatTimer = 5000;
+            m_uiEatTimer = 1000;
         }
     }
 
@@ -106,6 +107,10 @@ struct mob_mature_netherwing_drakeAI : public ScriptedAI
             m_creature->SetLevitate(false);
             m_creature->HandleEmote(EMOTE_ONESHOT_ATTACKUNARMED);
             m_creature->RemoveByteFlag(UNIT_FIELD_BYTES_1, UNIT_BYTES_1_OFFSET_MISC_FLAGS, UNIT_BYTE1_FLAG_FLY_ANIM);
+
+            // Despawn current carcass
+            if (GameObject* pGo = GetClosestGameObjectWithEntry(m_creature, GO_FLAYER_CARCASS, 3.0f))
+                pGo->SetLootState(GO_JUST_DEACTIVATED);
         }
     }
 
@@ -115,7 +120,7 @@ struct mob_mature_netherwing_drakeAI : public ScriptedAI
         {
             if (m_uiEatTimer <= uiDiff)
             {
-                if (GameObject* pGo = GetClosestGameObjectWithEntry(m_creature, GO_FLAYER_CARCASS, 80.0f))
+                if (GameObject* pGo = GetClosestGameObjectWithEntry(m_creature, GO_FLAYER_CARCASS, 100.0f))
                 {
                     if (m_creature->GetMotionMaster()->GetCurrentMovementGeneratorType() == WAYPOINT_MOTION_TYPE)
                         m_creature->GetMotionMaster()->MovementExpired();
@@ -142,7 +147,10 @@ struct mob_mature_netherwing_drakeAI : public ScriptedAI
                 DoScriptText(SAY_JUST_EATEN, m_creature);
 
                 if (Player* pPlayer = m_creature->GetMap()->GetPlayer(m_playerGuid))
+                {
+                    m_creature->SetFacingToObject(pPlayer);
                     pPlayer->KilledMonsterCredit(NPC_EVENT_PINGER, m_creature->GetObjectGuid());
+                }
 
                 Reset();
                 m_creature->SetLevitate(true);
@@ -751,15 +759,7 @@ static TorlothCinematic TorlothAnim[] =
     {0, TORLOTH, 0},                                    // Torloth attacks
 };
 
-struct Location
-{
-    float fLocX;
-    float fLocY;
-    float fLocZ;
-    float fOrient;
-};
-
-static Location SpawnLocation[] =
+static Position spawnLoc[] =
 {
     { -4615.8556f, 1342.2532f, 139.9f, 1.612f},             // Illidari Soldier
     { -4598.9365f, 1377.3182f, 139.9f, 3.917f},             // Illidari Soldier
@@ -1022,10 +1022,10 @@ struct npc_lord_illidan_stormrageAI : public Scripted_NoMovementAI
 
         for (uint8 i = 0; i < uiCount; ++i)
         {
-            float fLocX = SpawnLocation[uiLocIndex + i].fLocX;
-            float fLocY = SpawnLocation[uiLocIndex + i].fLocY;
-            float fLocZ = SpawnLocation[uiLocIndex + i].fLocZ;
-            float fOrient = SpawnLocation[uiLocIndex + i].fOrient;
+            float fLocX = spawnLoc[uiLocIndex + i].x;
+            float fLocY = spawnLoc[uiLocIndex + i].y;
+            float fLocZ = spawnLoc[uiLocIndex + i].z;
+            float fOrient = spawnLoc[uiLocIndex + i].o;
 
             if (Creature* pSpawn = m_creature->SummonCreature(WavesInfo[m_uiWaveCount].uiCreatureId, fLocX, fLocY, fLocZ, fOrient, TEMPSPAWN_TIMED_OOC_OR_DEAD_DESPAWN, 30000))
             {

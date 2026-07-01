@@ -950,6 +950,19 @@ void ScriptMgr::LoadScripts(ScriptMapType scriptType)
                 }
                 break;
             }
+            case SCRIPT_COMMAND_SPAWN_SPAWN_GROUP: 
+            {
+                auto const& spgCont = sObjectMgr.GetSpawnGroupContainer()->spawnGroupMap;
+                if (spgCont.find(tmp.spawnGroupData.groupId) == spgCont.end())
+                {
+                    sLog.outErrorDb("Table `%s` uses invalid spawngroup id(%u) skipping",
+                        tablename,
+                        tmp.spawnGroupData.groupId);
+                    continue;
+                }
+
+                break;
+            }
             default:
             {
                 sLog.outErrorDb("Table `%s` unknown command %u, skipping", tablename, tmp.command);
@@ -1861,7 +1874,11 @@ bool ScriptAction::ExecuteDbscriptCommand(WorldObject* pSource, WorldObject* pTa
             }
 
             // Normal Movement
-            unit->GetMotionMaster()->Clear();
+            if ((m_script->textId[1] & 0x1) != 0) // make it main movegen
+                unit->GetMotionMaster()->Clear(false, true);
+            else
+                unit->GetMotionMaster()->Clear();
+
             unit->GetMotionMaster()->MovePoint(0, Position(m_script->x, m_script->y, m_script->z, m_script->o), ForcedMovement(m_script->moveTo.forcedMovement), m_script->speed, true, pTarget ? pTarget->GetObjectGuid() : ObjectGuid(), m_script->moveTo.relayId);
             break;
         }
@@ -2814,6 +2831,8 @@ bool ScriptAction::ExecuteDbscriptCommand(WorldObject* pSource, WorldObject* pTa
                 z = std::max(z, pTarget->GetPositionZ());
                 source->UpdateAllowedPositionZ(x, y, z);
             }
+            if ((m_script->textId[2] & 0x1) != 0) // make it main movegen
+                source->GetMotionMaster()->Clear(false, true);
             source->GetMotionMaster()->MovePoint(1, Position(x, y, z, 0.f), ForcedMovement(m_script->textId[0]), 0.f, true, pTarget ? pTarget->GetObjectGuid() : ObjectGuid(), m_script->textId[1]);
             break;
         }
@@ -3267,6 +3286,18 @@ bool ScriptAction::ExecuteDbscriptCommand(WorldObject* pSource, WorldObject* pTa
         case SCRIPT_COMMAND_SET_STRING_ID:
         {
             pSource->SetStringId(m_script->stringId.stringId, m_script->stringId.apply);
+            break;
+        }
+        case SCRIPT_COMMAND_SPAWN_SPAWN_GROUP: 
+        {
+            uint32 time_to_despawn = m_script->spawnGroupData.despawnDelay;
+            SpawnGroup* group = pSource->GetMap()->GetSpawnManager().GetSpawnGroup(m_script->spawnGroupData.groupId);
+            if (group)
+            {
+                group->Spawn(true, false);
+                if (time_to_despawn != 0)
+                    group->Despawn(time_to_despawn, true);
+            }
             break;
         }
         default:

@@ -340,12 +340,7 @@ enum
     HORDE_COORDS    = 6
 };
 
-struct Location
-{
-    float x, y, z, o;
-};
-
-static Location AllianceCoords[] =
+static Position AllianceCoords[] =
 {
     { -3757.38f, -4533.05f, 14.16f, 3.62f },                 // Top-far-right bunk as seen from entrance
     { -3754.36f, -4539.13f, 14.16f, 5.13f },                 // Top-far-left bunk
@@ -361,7 +356,7 @@ static Location AllianceCoords[] =
 #define A_RUNTOY -4531.52f
 #define A_RUNTOZ 11.91f
 
-static Location HordeCoords[] =
+static Position HordeCoords[] =
 {
     { -1013.75f, -3492.59f, 62.62f, 4.34f },                 // Left, Behind
     { -1017.72f, -3490.92f, 62.62f, 4.34f },                 // Right, Behind
@@ -416,7 +411,7 @@ struct npc_doctorAI : public ScriptedAI
     bool m_bIsEventInProgress;
 
     GuidList m_lPatientGuids;
-    std::vector<Location*> m_vPatientSummonCoordinates;
+    std::vector<Position*> m_vPatientSummonCoordinates;
 
     void Reset() override
     {
@@ -442,8 +437,8 @@ struct npc_doctorAI : public ScriptedAI
     }
 
     void BeginEvent(Player* pPlayer);
-    void PatientDied(Location* pPoint);
-    void PatientSaved(Creature* pSoldier, Player* pPlayer, Location* pPoint);
+    void PatientDied(Position* pPoint);
+    void PatientSaved(Creature* pSoldier, Player* pPlayer, Position* pPoint);
     void UpdateAI(const uint32 uiDiff) override;
 };
 
@@ -456,7 +451,7 @@ struct npc_injured_patientAI : public ScriptedAI
     npc_injured_patientAI(Creature* pCreature) : ScriptedAI(pCreature), isSaved(false) {Reset();}
 
     ObjectGuid m_doctorGuid;
-    Location* m_pCoord;
+    Position* m_pCoord;
     bool isSaved;
 
     void EnterEvadeMode() override
@@ -610,7 +605,7 @@ void npc_doctorAI::BeginEvent(Player* pPlayer)
     m_creature->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_UNINTERACTIBLE);
 }
 
-void npc_doctorAI::PatientDied(Location* pPoint)
+void npc_doctorAI::PatientDied(Position* pPoint)
 {
     Player* pPlayer = m_creature->GetMap()->GetPlayer(m_playerGuid);
 
@@ -640,7 +635,7 @@ void npc_doctorAI::PatientDied(Location* pPoint)
         Reset();
 }
 
-void npc_doctorAI::PatientSaved(Creature* /*soldier*/, Player* pPlayer, Location* pPoint)
+void npc_doctorAI::PatientSaved(Creature* /*soldier*/, Player* pPlayer, Position* pPoint)
 {
     if (pPlayer && m_playerGuid == pPlayer->GetObjectGuid())
     {
@@ -723,7 +718,7 @@ void npc_doctorAI::UpdateAI(const uint32 uiDiff)
                     if (m_vPatientSummonCoordinates.empty())
                         break;
 
-                    std::vector<Location*>::iterator itr = m_vPatientSummonCoordinates.begin() + urand(0, m_vPatientSummonCoordinates.size() - 1);
+                    std::vector<Position*>::iterator itr = m_vPatientSummonCoordinates.begin() + urand(0, m_vPatientSummonCoordinates.size() - 1);
 
                     uint32 patientEntry = 0;
 
@@ -2842,6 +2837,110 @@ bool GossipHello_npc_gossip_npc(Player* player, Creature* creature)
     return true;
 }
 
+bool GossipHello_npc_paymaster(Player* player, Creature* creature)
+{
+    player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, "5,000 Gold", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF);
+    player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, "Profession Trainer", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 1);
+    player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, "I want to be Aldor.", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 2);
+    player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, "Let's go Scryer.", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 3);
+    player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, "Oh great Flaskataur, grant me reputation with all the Outland factions.", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 4);
+    player->SEND_GOSSIP_MENU(39288, creature->GetObjectGuid());
+    return true;
+}
+
+bool GossipSelect_npc_paymaster(Player* player, Creature* creature, uint32 /*sender*/, uint32 action)
+{
+    if (action > GOSSIP_ACTION_INFO_DEF + 4 && player->GetFreePrimaryProfessionPoints() == 0)
+        return false;
+
+    FactionEntry const* factionEntry;
+    switch (action)
+    {
+        case GOSSIP_ACTION_INFO_DEF:
+            player->CastSpell(player, 46642, TRIGGERED_OLD_TRIGGERED); // 5000 gold
+            break;
+        case GOSSIP_ACTION_INFO_DEF + 1:
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, "Jewelcrafting", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 5);
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, "Alchemy", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 6);
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, "Blacksmithing", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 7);
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, "Enchanting", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 8);
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, "Engineering", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 9);
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, "Herbalism", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 10);
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, "Leatherworking", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 11);
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, "Mining", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 12);
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, "Skinning", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 13);
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, "Tailoring", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 14);
+            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, "First Aid", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + 15);
+            player->SEND_GOSSIP_MENU(39288, creature->GetObjectGuid());
+            return true;
+        case GOSSIP_ACTION_INFO_DEF + 2:
+            factionEntry = sFactionStore.LookupEntry<FactionEntry>(932);
+            player->GetReputationMgr().ModifyReputation(factionEntry, 84000);
+            break;
+        case GOSSIP_ACTION_INFO_DEF + 3:
+            factionEntry = sFactionStore.LookupEntry<FactionEntry>(934);
+            player->GetReputationMgr().ModifyReputation(factionEntry, 84000);
+            player->CLOSE_GOSSIP_MENU();
+            return true;
+        case GOSSIP_ACTION_INFO_DEF + 4:
+            factionEntry = sFactionStore.LookupEntry<FactionEntry>(967);
+            player->GetReputationMgr().ModifyReputation(factionEntry, 84000);
+            factionEntry = sFactionStore.LookupEntry<FactionEntry>(990);
+            player->GetReputationMgr().ModifyReputation(factionEntry, 84000);
+            factionEntry = sFactionStore.LookupEntry<FactionEntry>(1012);
+            player->GetReputationMgr().ModifyReputation(factionEntry, 84000);
+            break;
+        case GOSSIP_ACTION_INFO_DEF + 5:
+            player->learnSpellHighRank(28897);
+            player->SetSkill(755, 375, 375);
+            break;
+        case GOSSIP_ACTION_INFO_DEF + 6:
+            player->learnSpellHighRank(28596);
+            player->SetSkill(171, 375, 375);
+            break;
+        case GOSSIP_ACTION_INFO_DEF + 7:
+            player->learnSpellHighRank(29844);
+            player->SetSkill(164, 375, 375);
+            break;
+        case GOSSIP_ACTION_INFO_DEF + 8:
+            player->learnSpellHighRank(28029);
+            player->SetSkill(333, 375, 375);
+            break;
+        case GOSSIP_ACTION_INFO_DEF + 9:
+            player->learnSpellHighRank(30350);
+            player->SetSkill(202, 375, 375);
+            break;
+        case GOSSIP_ACTION_INFO_DEF + 10:
+            player->learnSpellHighRank(28695);
+            player->SetSkill(182, 375, 375);
+            break;
+        case GOSSIP_ACTION_INFO_DEF + 11:
+            player->learnSpellHighRank(32549);
+            player->SetSkill(165, 375, 375);
+            break;
+        case GOSSIP_ACTION_INFO_DEF + 12:
+            player->learnSpellHighRank(29354);
+            player->SetSkill(186, 375, 375);
+            break;
+        case GOSSIP_ACTION_INFO_DEF + 13:
+            player->learnSpellHighRank(32678);
+            player->SetSkill(393, 375, 375);
+            break;
+        case GOSSIP_ACTION_INFO_DEF + 14:
+            player->learnSpellHighRank(26790);
+            player->SetSkill(197, 375, 375);
+            break;
+        case GOSSIP_ACTION_INFO_DEF + 15:
+            player->learnSpellHighRank(27028);
+            player->SetSkill(129, 375, 375);
+            break;
+        default:
+            return false;
+    }
+    player->CLOSE_GOSSIP_MENU();
+    return true;
+}
+
 void AddSC_npcs_special()
 {
     Script* pNewScript = new Script;
@@ -2955,6 +3054,12 @@ void AddSC_npcs_special()
     pNewScript->Name = "npc_gossip_npc";
     pNewScript->GetAI = &GetNewAIInstance<GossipNPCAI>;
     pNewScript->pGossipHello = &GossipHello_npc_gossip_npc;
+    pNewScript->RegisterSelf();
+
+    pNewScript = new Script;
+    pNewScript->Name = "npc_paymaster";
+    pNewScript->pGossipHello = &GossipHello_npc_paymaster;
+    pNewScript->pGossipSelect = &GossipSelect_npc_paymaster;
     pNewScript->RegisterSelf();
 
     RegisterSpellScript<PaladinQuestReviveSelf>("spell_paladin_quest_revive_self");

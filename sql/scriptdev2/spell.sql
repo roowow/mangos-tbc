@@ -39,6 +39,7 @@ INSERT INTO spell_scripts(Id, ScriptName) VALUES
 (8655,'spell_tribal_death'),
 (8894,'spell_tribal_death'),
 (9144,'spell_tribal_death'),
+(15782,'spell_tribal_death'),
 (9204,'spell_hate_to_zero'),
 (20538,'spell_hate_to_zero'),
 (26569,'spell_hate_to_zero'),
@@ -68,7 +69,7 @@ INSERT INTO spell_scripts(Id, ScriptName) VALUES
 (13493,'spell_gdr_periodic'),
 (14250,'spell_capture_grark'),
 (15712,'spell_linkens_boomerang'),
-(16380,'spell_greater_invisibility_mob'),
+(16380,'spell_detect_through_invisibility_mob'),
 (16510,'spell_corrupted_saber_visual'),
 (16739,'spell_orb_of_deception'),
 (17016,'spell_placing_beacon_torch'),
@@ -77,6 +78,7 @@ INSERT INTO spell_scripts(Id, ScriptName) VALUES
 (17536,'spell_awaken_kerlonian'),
 (18153,'spell_kodo_kombobulator'),
 (18969,'spell_taelan_death'),
+(19134,'spell_intimidating_shout'),
 (19707,'spell_hate_to_half'),
 (19832,'spell_possess_razorgore'),
 (19872,'spell_calm_dragonkin'),
@@ -322,7 +324,8 @@ INSERT INTO spell_scripts(Id, ScriptName) VALUES
 (43323,'spell_human_child_crying'),
 (42178,'spell_invisible_campfire_remove'),
 (38048,'spell_curse_of_pain'),
-(32811,'spell_greater_invisibility_mob'),
+(32811,'spell_detect_through_invisibility_mob'),
+(32943,'spell_detect_through_invisibility_mob'),
 (29339,'spell_healing_touch_horses'),
 (29340,'spell_whip_frenzy_horses'),
 (29521,'spell_dance_vibe'),
@@ -368,6 +371,8 @@ INSERT INTO spell_scripts(Id, ScriptName) VALUES
 (32325,'spell_void_blast'),
 (38760,'spell_void_blast'),
 (33558,'spell_draw_shadows_trigger'),
+(33789,'spell_intimidating_shout'),
+(38945,'spell_intimidating_shout'),
 (34662,'spell_bear_command'),
 (34665,'spell_administer_antidote'),
 (37689,'spell_tell_dog_i_just_died'),
@@ -397,6 +402,7 @@ INSERT INTO spell_scripts(Id, ScriptName) VALUES
 (36291,'spell_pure_nether_beam_parent'),
 (40468,'spell_serving_poisoned_mutton'),
 (40131,'spell_shroud_of_death'),
+(36485,'spell_avenger_trigger_detonation'),
 (36652,'spell_tuber_whistle'),
 (37027,'spell_remote_toy_trigger'),
 (39228,'spell_argussian_compass'),
@@ -438,6 +444,7 @@ INSERT INTO spell_scripts(Id, ScriptName) VALUES
 (31606,'spell_stormcrow_amulet'),
 (30700,'spell_face_highest_threat'),
 (30753,'spell_red_riding_hood_fixate'),
+(30769,'spell_pick_red_ridding_hood'),
 (30618,'spell_beatdown'),
 (34877,'spell_prevent_spell_if_same_aura_on_caster'),
 (35679,'spell_prevent_spell_if_same_aura_on_caster'),
@@ -775,7 +782,10 @@ INSERT INTO spell_scripts(Id, ScriptName) VALUES
 (34799,'spell_arcane_devastation'),
 (34145,'spell_ritual_of_souls_dummy'),
 (34219,'spell_recharging_battery'),
-(32173,'spell_entangling_roots');
+(32173,'spell_entangling_roots'),
+(34520,'spell_elemental_power_extractor'),
+(35268,'spell_raging_flames_inferno'),
+(39346,'spell_raging_flames_inferno');
 
 -- Wotlk
 INSERT INTO spell_scripts(Id, ScriptName) VALUES
@@ -791,9 +801,25 @@ INSERT INTO spell_scripts(Id, ScriptName) VALUES
 (14323,'spell_hunters_mark'),
 (14324,'spell_hunters_mark'),
 (14325,'spell_hunters_mark'),
+(1515,'spell_tame_beast'),
 (34026,'spell_kill_command'),
 (34477,'spell_misdirection'),
-(34501,'spell_expose_weakness');
+(34501,'spell_expose_weakness'),
+(19597, 'spell_taming_pet_rod'),
+(19676, 'spell_taming_pet_rod'),
+(19677, 'spell_taming_pet_rod'),
+(19678, 'spell_taming_pet_rod'),
+(19679, 'spell_taming_pet_rod'),
+(19680, 'spell_taming_pet_rod'),
+(19681, 'spell_taming_pet_rod'),
+(19682, 'spell_taming_pet_rod'),
+(19683, 'spell_taming_pet_rod'),
+(19684, 'spell_taming_pet_rod'),
+(19685, 'spell_taming_pet_rod'),
+(19686, 'spell_taming_pet_rod'),
+(30100, 'spell_taming_pet_rod'),
+(30103, 'spell_taming_pet_rod'),
+(30104, 'spell_taming_pet_rod');
 
 -- Priest
 INSERT INTO spell_scripts(Id, ScriptName) VALUES
@@ -964,6 +990,7 @@ INSERT INTO spell_scripts(Id, ScriptName) VALUES
 
 -- Warrior
 INSERT INTO spell_scripts(Id, ScriptName) VALUES
+(5246,'spell_intimidating_shout'),
 (5308,'spell_warrior_execute'),
 (20658,'spell_warrior_execute'),
 (20660,'spell_warrior_execute'),
@@ -982,11 +1009,6 @@ INSERT INTO spell_scripts(Id, ScriptName) VALUES
 
 -- Mage
 INSERT INTO spell_scripts(Id, ScriptName) VALUES
-(11213,'spell_arcane_concentration'),
-(12574,'spell_arcane_concentration'),
-(12575,'spell_arcane_concentration'),
-(12576,'spell_arcane_concentration'),
-(12577,'spell_arcane_concentration'),
 (11170,'spell_shatter_mage'),
 (12982,'spell_shatter_mage'),
 (12983,'spell_shatter_mage'),
@@ -1223,6 +1245,30 @@ INSERT INTO spell_scripts(Id, ScriptName) VALUES
 
 -- World Events
 INSERT INTO spell_scripts(Id, ScriptName) VALUES
+-- PTR
+(47327,'spell_summon_pedestal_npc'),
+(47347,'spell_summon_pedestal_npc'),
+(47348,'spell_summon_pedestal_npc'),
+(47349,'spell_summon_pedestal_npc'),
+(47350,'spell_summon_pedestal_npc'),
+(47351,'spell_summon_pedestal_npc'),
+(47352,'spell_summon_pedestal_npc'),
+(47353,'spell_summon_pedestal_npc'),
+(47354,'spell_summon_pedestal_npc'),
+(47355,'spell_summon_pedestal_npc'),
+(47356,'spell_summon_pedestal_npc'),
+(47357,'spell_summon_pedestal_npc'),
+(47358,'spell_summon_pedestal_npc'),
+(47359,'spell_summon_pedestal_npc'),
+(47360,'spell_summon_pedestal_npc'),
+(47361,'spell_summon_pedestal_npc'),
+(47362,'spell_summon_pedestal_npc'),
+(47363,'spell_summon_pedestal_npc'),
+(47364,'spell_summon_pedestal_npc'),
+(47365,'spell_summon_pedestal_npc'),
+(47366,'spell_summon_pedestal_npc'),
+(47367,'spell_summon_pedestal_npc'),
+(47368,'spell_summon_pedestal_npc'),
 -- Lunar Festival
 (26286, 'spell_lunar_festival_firework'),
 (26291, 'spell_lunar_festival_firework'),
