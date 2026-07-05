@@ -22499,13 +22499,10 @@ bool Player::AddTalent(std::string name)
         if (oowowInfo.DualTalents.count(i))
             continue;
 
-        std::string q1 = "INSERT INTO `character_spell_talent` (`Flag`, `Guid`, `name`) VALUES ('";
-        q1 = q1 + std::to_string(i) + std::string("', '");
-        q1 = q1 + std::to_string(GetGUIDLow()) + std::string("', '");
-        q1 = q1 + name + std::string("');");
-
-        const char *query = q1.c_str();
-        CharacterDatabase.PExecute(query);
+        std::string escapedName = name;
+        CharacterDatabase.escape_string(escapedName);
+        CharacterDatabase.PExecute("INSERT INTO `character_spell_talent` (`Flag`, `Guid`, `name`) VALUES ('%u', '%u', '%s')",
+                                    uint32(i), GetGUIDLow(), escapedName.c_str());
 
         oowowInfo.DualTalents[i] = name;
 
@@ -22532,6 +22529,8 @@ bool Player::DeleteTalent(uint32 talent)
     CastSpell(this, 14867, TRIGGERED_OLD_TRIGGERED);                  // spell: "Untalent Visual Effect"
 
     TextEmote("收回了一部分灵魂，此刻非常的兴奋。");
+
+    return true;
 }
 
 bool Player::SetStunnedByLogout(bool apply)

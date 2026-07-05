@@ -81,7 +81,7 @@ struct BonfireArtkit : public SpellScript
 {
     void OnEffectExecute(Spell* spell, SpellEffectIndex effIdx) const override
     {
-        if (effIdx != EFFECT_INDEX_0 || !spell->GetGOTarget())
+        if (effIdx != EFFECT_INDEX_0 || !spell->GetGOTarget() || !spell->GetGOTarget()->AI())
             return;
 
         spell->GetGOTarget()->AI()->ReceiveAIEvent(spell->m_spellInfo->Id == SPELL_STAMP_OUT_BONFIRE_ART_KIT ? AI_EVENT_CUSTOM_A : AI_EVENT_CUSTOM_B);
