@@ -239,22 +239,39 @@ void WorldSession::HandleTrainerBuySpellOpcode(WorldPacket& recv_data)
     recv_data >> guid >> spellId;
     DEBUG_LOG("WORLD: Received opcode CMSG_TRAINER_BUY_SPELL Trainer: %s, learn spell id is: %u", guid.GetString().c_str(), spellId);
 
+    // The trainer window can't be trusted to redraw itself correctly from an updated list pushed mid-session
+    // (observed: pet-taught entries flip state server-side but the client keeps showing stale colors, letting
+    // players click on things that are no longer purchasable). Instead of trying to keep it open and in sync,
+    // just close it on every exit path below - the client always renders correctly on the next fresh open.
+    auto closeTrainerWindow = [this]()
+    {
+        WorldPacket close(SMSG_GOSSIP_COMPLETE, 0);
+        SendPacket(close);
+    };
+
     Creature* unit = GetPlayer()->GetNPCIfCanInteractWith(guid, UNIT_NPC_FLAG_TRAINER);
     if (!unit)
     {
         DEBUG_LOG("WORLD: HandleTrainerBuySpellOpcode - %s not found or you can't interact with him.", guid.GetString().c_str());
+        closeTrainerWindow();
         return;
     }
 
     if (!unit->IsTrainerOf(_player, true))
+    {
+        closeTrainerWindow();
         return;
+    }
 
     // check present spell in trainer spell list
     TrainerSpellData const* cSpells = unit->GetTrainerSpells();
     TrainerSpellData const* tSpells = unit->GetTrainerTemplateSpells();
 
     if (!cSpells && !tSpells)
+    {
+        closeTrainerWindow();
         return;
+    }
 
     // Try find spell in npc_trainer
     TrainerSpell const* trainer_spell = cSpells ? cSpells->Find(spellId) : nullptr;
@@ -265,23 +282,35 @@ void WorldSession::HandleTrainerBuySpellOpcode(WorldPacket& recv_data)
 
     // Not found anywhere, cheating?
     if (!trainer_spell)
+    {
+        closeTrainerWindow();
         return;
+    }
 
     // can't be learn, cheat? Or double learn with lags...
     uint32 reqLevel = 0;
     if (!_player->IsSpellFitByClassAndRace(trainer_spell->spell, &reqLevel))
+    {
+        closeTrainerWindow();
         return;
+    }
 
     reqLevel = trainer_spell->isProvidedReqLevel ? trainer_spell->reqLevel : std::max(reqLevel, trainer_spell->reqLevel);
     if (_player->GetTrainerSpellState(trainer_spell, reqLevel) != TRAINER_SPELL_GREEN)
+    {
+        closeTrainerWindow();
         return;
+    }
 
     // apply reputation discount
     uint32 nSpellCost = uint32(floor(trainer_spell->spellCost * _player->GetReputationPriceDiscount(unit)));
 
     // check money requirement
     if (_player->GetMoney() < nSpellCost)
+    {
+        closeTrainerWindow();
         return;
+    }
 
     _player->ModifyMoney(-int32(nSpellCost));
 
@@ -304,9 +333,7 @@ void WorldSession::HandleTrainerBuySpellOpcode(WorldPacket& recv_data)
     data << uint32(spellId);                                // should be same as in packet from client
     SendPacket(data);
 
-    // Push a freshly recomputed list right away instead of leaving the client to redraw the window from
-    // stale state on its own; it has no way to know pet-taught entries flipped state without this.
-    SendTrainerList(guid);
+    closeTrainerWindow();
 }
 
 void WorldSession::HandleGossipHelloOpcode(WorldPacket& recv_data)
