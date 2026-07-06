@@ -4156,10 +4156,31 @@ TrainerSpellState Player::GetTrainerSpellState(TrainerSpell const* trainer_spell
     
     bool hasLearnSpellEffect = trainer_spell->learnedSpell.size() > 1;
     bool knowsAllLearnedSpells = true;
+
+    // Beast Training-style entries cast a spell targeted at the caster's pet (SPELL_EFFECT_LEARN_SPELL
+    // with TARGET_UNIT_CASTER_PET), which teaches the ability to the pet's own spellbook, not the player's.
+    SpellEntry const* triggerSpellInfo = sSpellTemplate.LookupEntry<SpellEntry>(trainer_spell->spell);
+    auto isPetTaughtSpell = [triggerSpellInfo](uint32 learnedSpell)
+    {
+        if (!triggerSpellInfo)
+            return false;
+
+        for (int i = 0; i < MAX_EFFECT_INDEX; ++i)
+            if (triggerSpellInfo->Effect[i] == SPELL_EFFECT_LEARN_SPELL && triggerSpellInfo->EffectTriggerSpell[i] == learnedSpell &&
+                (triggerSpellInfo->EffectImplicitTargetA[i] == TARGET_UNIT_CASTER_PET || triggerSpellInfo->EffectImplicitTargetB[i] == TARGET_UNIT_CASTER_PET))
+                return true;
+
+        return false;
+    };
+
     for (uint32 learnedSpell : trainer_spell->learnedSpell)
     {
-        if (trainer_spell->spell != learnedSpell && !HasSpell(learnedSpell))
-            knowsAllLearnedSpells = false;
+        if (trainer_spell->spell != learnedSpell)
+        {
+            bool known = isPetTaughtSpell(learnedSpell) ? (GetPet() && GetPet()->HasSpell(learnedSpell)) : HasSpell(learnedSpell);
+            if (!known)
+                knowsAllLearnedSpells = false;
+        }
 
         if (SpellChainNode const* spell_chain = sSpellMgr.GetSpellChainNode(learnedSpell))
         {
