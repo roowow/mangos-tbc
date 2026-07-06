@@ -4185,11 +4185,23 @@ TrainerSpellState Player::GetTrainerSpellState(TrainerSpell const* trainer_spell
             {
                 knowsAllLearnedSpells = false;
 
-                // Pet abilities are paid for out of the pet's own training point pool (EffectLearnPetSpell
-                // deducts unconditionally); without this check the trainer would happily charge gold and
-                // teach past what the pet can actually afford, driving its point pool negative.
-                if (petTaught && (!GetPet() || GetPet()->m_TrainingPoints < GetPet()->GetTPForSpell(learnedSpell)))
-                    return TRAINER_SPELL_RED;
+                // Spell::CheckCast() rejects SPELL_EFFECT_LEARN_SPELL/LEARN_PET_SPELL at cast time if the
+                // pet's own level is below the ability's spellLevel, or if the pet lacks training points
+                // (EffectLearnPetSpell itself deducts unconditionally with no such guard). Trainer gold is
+                // already spent by the time that cast-time check runs, so mirror both gates here to keep
+                // the trainer from charging for something the cast is just going to refuse anyway.
+                if (petTaught)
+                {
+                    if (!GetPet())
+                        return TRAINER_SPELL_RED;
+
+                    SpellEntry const* petSpellInfo = sSpellTemplate.LookupEntry<SpellEntry>(learnedSpell);
+                    if (petSpellInfo && petSpellInfo->spellLevel > GetPet()->GetLevel())
+                        return TRAINER_SPELL_RED;
+
+                    if (GetPet()->m_TrainingPoints < GetPet()->GetTPForSpell(learnedSpell))
+                        return TRAINER_SPELL_RED;
+                }
             }
         }
 
