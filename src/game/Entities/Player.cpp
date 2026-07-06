@@ -4177,9 +4177,18 @@ TrainerSpellState Player::GetTrainerSpellState(TrainerSpell const* trainer_spell
     {
         if (trainer_spell->spell != learnedSpell)
         {
-            bool known = isPetTaughtSpell(learnedSpell) ? (GetPet() && GetPet()->HasSpell(learnedSpell)) : HasSpell(learnedSpell);
+            bool petTaught = isPetTaughtSpell(learnedSpell);
+            bool known = petTaught ? (GetPet() && GetPet()->HasSpell(learnedSpell)) : HasSpell(learnedSpell);
             if (!known)
+            {
                 knowsAllLearnedSpells = false;
+
+                // Pet abilities are paid for out of the pet's own training point pool (EffectLearnPetSpell
+                // deducts unconditionally); without this check the trainer would happily charge gold and
+                // teach past what the pet can actually afford, driving its point pool negative.
+                if (petTaught && (!GetPet() || GetPet()->m_TrainingPoints < GetPet()->GetTPForSpell(learnedSpell)))
+                    return TRAINER_SPELL_RED;
+            }
         }
 
         if (SpellChainNode const* spell_chain = sSpellMgr.GetSpellChainNode(learnedSpell))
