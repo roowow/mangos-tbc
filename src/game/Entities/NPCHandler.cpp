@@ -231,6 +231,12 @@ void WorldSession::SendTrainerList(ObjectGuid guid) const
     SendPacket(data);
 }
 
+enum TrainerFailReason
+{
+    TRAINER_FAIL_REASON_UNAVAILABLE      = 1,
+    TRAINER_FAIL_REASON_NOT_ENOUGH_MONEY = 2
+};
+
 void WorldSession::HandleTrainerBuySpellOpcode(WorldPacket& recv_data)
 {
     ObjectGuid guid;
@@ -239,27 +245,29 @@ void WorldSession::HandleTrainerBuySpellOpcode(WorldPacket& recv_data)
     recv_data >> guid >> spellId;
     DEBUG_LOG("WORLD: Received opcode CMSG_TRAINER_BUY_SPELL Trainer: %s, learn spell id is: %u", guid.GetString().c_str(), spellId);
 
-    // The trainer window can't be trusted to redraw itself correctly from an updated list pushed mid-session
-    // (observed: pet-taught entries flip state server-side but the client keeps showing stale colors, letting
-    // players click on things that are no longer purchasable). Instead of trying to keep it open and in sync,
-    // just close it on every exit path below - the client always renders correctly on the next fresh open.
-    auto closeTrainerWindow = [this]()
+    // SMSG_TRAINER_BUY_FAILED is the dedicated reply the client expects for a rejected purchase (it was defined
+    // in the opcode table but never actually sent from here); every failure path below used to just silently
+    // return with no packet at all, leaving the client's own trainer window in whatever stale state it had.
+    auto sendTrainerBuyFailed = [this, &guid, &spellId](uint32 reason)
     {
-        WorldPacket close(SMSG_GOSSIP_COMPLETE, 0);
-        SendPacket(close);
+        WorldPacket data(SMSG_TRAINER_BUY_FAILED, 8 + 4 + 4);
+        data << ObjectGuid(guid);
+        data << uint32(spellId);
+        data << uint32(reason);
+        SendPacket(data);
     };
 
     Creature* unit = GetPlayer()->GetNPCIfCanInteractWith(guid, UNIT_NPC_FLAG_TRAINER);
     if (!unit)
     {
         DEBUG_LOG("WORLD: HandleTrainerBuySpellOpcode - %s not found or you can't interact with him.", guid.GetString().c_str());
-        closeTrainerWindow();
+        sendTrainerBuyFailed(TRAINER_FAIL_REASON_UNAVAILABLE);
         return;
     }
 
     if (!unit->IsTrainerOf(_player, true))
     {
-        closeTrainerWindow();
+        sendTrainerBuyFailed(TRAINER_FAIL_REASON_UNAVAILABLE);
         return;
     }
 
@@ -269,7 +277,7 @@ void WorldSession::HandleTrainerBuySpellOpcode(WorldPacket& recv_data)
 
     if (!cSpells && !tSpells)
     {
-        closeTrainerWindow();
+        sendTrainerBuyFailed(TRAINER_FAIL_REASON_UNAVAILABLE);
         return;
     }
 
@@ -283,7 +291,7 @@ void WorldSession::HandleTrainerBuySpellOpcode(WorldPacket& recv_data)
     // Not found anywhere, cheating?
     if (!trainer_spell)
     {
-        closeTrainerWindow();
+        sendTrainerBuyFailed(TRAINER_FAIL_REASON_UNAVAILABLE);
         return;
     }
 
@@ -291,14 +299,14 @@ void WorldSession::HandleTrainerBuySpellOpcode(WorldPacket& recv_data)
     uint32 reqLevel = 0;
     if (!_player->IsSpellFitByClassAndRace(trainer_spell->spell, &reqLevel))
     {
-        closeTrainerWindow();
+        sendTrainerBuyFailed(TRAINER_FAIL_REASON_UNAVAILABLE);
         return;
     }
 
     reqLevel = trainer_spell->isProvidedReqLevel ? trainer_spell->reqLevel : std::max(reqLevel, trainer_spell->reqLevel);
     if (_player->GetTrainerSpellState(trainer_spell, reqLevel) != TRAINER_SPELL_GREEN)
     {
-        closeTrainerWindow();
+        sendTrainerBuyFailed(TRAINER_FAIL_REASON_UNAVAILABLE);
         return;
     }
 
@@ -308,7 +316,7 @@ void WorldSession::HandleTrainerBuySpellOpcode(WorldPacket& recv_data)
     // check money requirement
     if (_player->GetMoney() < nSpellCost)
     {
-        closeTrainerWindow();
+        sendTrainerBuyFailed(TRAINER_FAIL_REASON_NOT_ENOUGH_MONEY);
         return;
     }
 
@@ -332,8 +340,6 @@ void WorldSession::HandleTrainerBuySpellOpcode(WorldPacket& recv_data)
     data << ObjectGuid(guid);
     data << uint32(spellId);                                // should be same as in packet from client
     SendPacket(data);
-
-    closeTrainerWindow();
 }
 
 void WorldSession::HandleGossipHelloOpcode(WorldPacket& recv_data)
