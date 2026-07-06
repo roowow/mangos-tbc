@@ -303,6 +303,10 @@ void WorldSession::HandleTrainerBuySpellOpcode(WorldPacket& recv_data)
     data << ObjectGuid(guid);
     data << uint32(spellId);                                // should be same as in packet from client
     SendPacket(data);
+
+    // Push a freshly recomputed list right away instead of leaving the client to redraw the window from
+    // stale state on its own; it has no way to know pet-taught entries flipped state without this.
+    SendTrainerList(guid);
 }
 
 void WorldSession::HandleGossipHelloOpcode(WorldPacket& recv_data)
