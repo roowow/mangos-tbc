@@ -38,6 +38,10 @@ bool ChatHandler::HandlePetLevelLoyaltyCommand(char* args)
     uint32 loyaltyLevel = pet->GetLoyaltyLevel();
     for (; loyaltyLevel < BEST_FRIEND && levelupCount > 0; levelupCount--)
     {
+        // Pet::ModifyLoyalty() only levels up loyalty once the pet has also earned enough kill XP
+        // to clear its per-level XP requirement; this command is meant to force the level up outright,
+        // so clear that requirement first instead of leaving it to silently block the level up.
+        pet->UpdateRequireXpForNextLoyaltyLevel(std::numeric_limits<uint32>::max());
         pet->ModifyLoyalty(pet->GetStartLoyaltyPoints(loyaltyLevel + 1));
         ++loyaltyLevel;
     }
