@@ -496,6 +496,9 @@ void Warden::Update(uint32 /*diff*/)
     {
         sLog.outBasic("WARDEN: Account %u ip %s timeout", _session->GetAccountId(), _session->GetRemoteAddress().c_str());
         _session->KickPlayer();
+        // KickPlayer() only flags the session for later teardown; without clearing the clock here,
+        // every subsequent tick before the session actually closes re-enters this branch and re-logs/re-kicks.
+        StopTimeoutClock();
         return;
     }
 
