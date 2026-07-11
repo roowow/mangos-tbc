@@ -4175,6 +4175,22 @@ TrainerSpellState Player::GetTrainerSpellState(TrainerSpell const* trainer_spell
         return false;
     };
 
+    // Pet::addSpell() unlearns a rank outright once a higher one in the same chain is learned - a pet
+    // only ever keeps its single highest-known rank, never the whole history. So "does the pet meet
+    // requirement X" can't just be HasSpell(X): X may have been legitimately superseded and removed.
+    // Accept any currently-known pet spell that is X itself or a higher rank of the same chain.
+    auto petMeetsPetSpellRequirement = [](Pet* pet, uint32 requiredSpell)
+    {
+        if (!pet)
+            return false;
+        if (pet->HasSpell(requiredSpell))
+            return true;
+        for (auto const& petSpellEntry : pet->m_spells)
+            if (petSpellEntry.second.state != PETSPELL_REMOVED && sSpellMgr.IsSpellHigherRankOfSpell(petSpellEntry.first, requiredSpell))
+                return true;
+        return false;
+    };
+
     for (uint32 learnedSpell : trainer_spell->learnedSpell)
     {
         // Beast Training rank chains (e.g. Great Stamina 1/2/3/...) are auto-linked into SpellChainNode
@@ -4182,10 +4198,12 @@ TrainerSpellState Player::GetTrainerSpellState(TrainerSpell const* trainer_spell
         // load log), not just the spell_chain SQL table, so the prev/req check below applies even for
         // pet abilities that have no override row in that table.
         bool petTaught = isPetTaughtSpell(learnedSpell);
+        bool alreadyKnown = false;
 
         if (trainer_spell->spell != learnedSpell)
         {
-            bool known = petTaught ? (GetPet() && GetPet()->HasSpell(learnedSpell)) : HasSpell(learnedSpell);
+            bool known = petTaught ? petMeetsPetSpellRequirement(GetPet(), learnedSpell) : HasSpell(learnedSpell);
+            alreadyKnown = known;
             if (!known)
             {
                 knowsAllLearnedSpells = false;
@@ -4212,21 +4230,27 @@ TrainerSpellState Player::GetTrainerSpellState(TrainerSpell const* trainer_spell
 
         if (SpellChainNode const* spell_chain = sSpellMgr.GetSpellChainNode(learnedSpell))
         {
-            // check prev.rank requirement - for a pet-taught rank this lives in the pet's spellbook, not the player's
-            if (spell_chain->prev)
+            // Once this exact rank is already known (or superseded by something higher), there is nothing
+            // left to gate: skip the prev/req checks entirely rather than risk them looking for a rank id
+            // the pet legitimately no longer has.
+            if (!alreadyKnown)
             {
-                bool hasPrev = petTaught ? (GetPet() && GetPet()->HasSpell(spell_chain->prev)) : HasSpell(spell_chain->prev);
-                if (!hasPrev)
-                    return TRAINER_SPELL_RED;
-            }
+                // check prev.rank requirement - for a pet-taught rank this lives in the pet's spellbook, not the player's
+                if (spell_chain->prev)
+                {
+                    bool hasPrev = petTaught ? petMeetsPetSpellRequirement(GetPet(), spell_chain->prev) : HasSpell(spell_chain->prev);
+                    if (!hasPrev)
+                        return TRAINER_SPELL_RED;
+                }
 
-            // check additional spell requirement
-            if (spell_chain->req)
-            {
-                bool hasReq = petTaught ? (GetPet() && GetPet()->HasSpell(spell_chain->req)) : HasSpell(spell_chain->req);
-                if (!hasReq &&
-                    std::find(trainer_spell->learnedSpell.begin(), trainer_spell->learnedSpell.end(), spell_chain->req) == trainer_spell->learnedSpell.end())
-                    return TRAINER_SPELL_RED;
+                // check additional spell requirement
+                if (spell_chain->req)
+                {
+                    bool hasReq = petTaught ? petMeetsPetSpellRequirement(GetPet(), spell_chain->req) : HasSpell(spell_chain->req);
+                    if (!hasReq &&
+                        std::find(trainer_spell->learnedSpell.begin(), trainer_spell->learnedSpell.end(), spell_chain->req) == trainer_spell->learnedSpell.end())
+                        return TRAINER_SPELL_RED;
+                }
             }
         }
 
