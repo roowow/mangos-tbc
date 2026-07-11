@@ -4139,35 +4139,20 @@ TrainerSpellState Player::GetTrainerSpellState(TrainerSpell const* trainer_spell
     if (!trainer_spell)
         return TRAINER_SPELL_RED;
 
-    // TRAINER-DEBUG: every return point below is instrumented so a single trainer-window open captures
-    // the full decision trace for every rank in one pass. Tag every line with the wrapper spell id so
-    // separate ranks (each a separate call into this function) can't be confused with one another.
-    uint32 dbgWrapperSpell = trainer_spell->spell;
-    sLog.outError("TRAINER-DEBUG[%u]: enter, reqLevel(param)=%u, playerLevel=%u", dbgWrapperSpell, reqLevel, GetLevel());
-
     // known spell
     if (HasSpell(trainer_spell->spell))
-    {
-        sLog.outError("TRAINER-DEBUG[%u]: GRAY - player already has wrapper spell", dbgWrapperSpell);
         return TRAINER_SPELL_GRAY;
-    }
 
     // check race/class requirement
     if (!IsSpellFitByClassAndRace(trainer_spell->spell))
-    {
-        sLog.outError("TRAINER-DEBUG[%u]: RED - IsSpellFitByClassAndRace failed", dbgWrapperSpell);
         return TRAINER_SPELL_RED;
-    }
 
     bool prof = SpellMgr::IsProfessionSpell(trainer_spell->spell);
 
     // check level requirement
     if (!prof || GetSession()->GetSecurity() < AccountTypes(sWorld.getConfig(CONFIG_UINT32_TRADE_SKILL_GMIGNORE_LEVEL)))
         if (GetLevel() < reqLevel)
-        {
-            sLog.outError("TRAINER-DEBUG[%u]: RED - player level %u < reqLevel %u", dbgWrapperSpell, GetLevel(), reqLevel);
             return TRAINER_SPELL_RED;
-        }
 
     bool hasLearnSpellEffect = trainer_spell->learnedSpell.size() > 1;
     bool knowsAllLearnedSpells = true;
@@ -4190,12 +4175,15 @@ TrainerSpellState Player::GetTrainerSpellState(TrainerSpell const* trainer_spell
 
     for (uint32 learnedSpell : trainer_spell->learnedSpell)
     {
+        // Beast Training rank chains (e.g. Great Stamina 1/2/3/...) are auto-linked into SpellChainNode
+        // data straight from the DBC at load time (see the "N from DBC data" count in the spell chain
+        // load log), not just the spell_chain SQL table, so the prev/req check below applies even for
+        // pet abilities that have no override row in that table.
+        bool petTaught = isPetTaughtSpell(learnedSpell);
+
         if (trainer_spell->spell != learnedSpell)
         {
-            bool petTaught = isPetTaughtSpell(learnedSpell);
             bool known = petTaught ? (GetPet() && GetPet()->HasSpell(learnedSpell)) : HasSpell(learnedSpell);
-            sLog.outError("TRAINER-DEBUG[%u]: learnedSpell %u, petTaught=%d, known=%d (pet=%s)",
-                           dbgWrapperSpell, learnedSpell, petTaught, known, GetPet() ? GetPet()->GetGuidStr().c_str() : "null");
             if (!known)
             {
                 knowsAllLearnedSpells = false;
@@ -4208,52 +4196,35 @@ TrainerSpellState Player::GetTrainerSpellState(TrainerSpell const* trainer_spell
                 if (petTaught)
                 {
                     if (!GetPet())
-                    {
-                        sLog.outError("TRAINER-DEBUG[%u]: RED - learnedSpell %u, no pet found on caster (accountId %u)", dbgWrapperSpell, learnedSpell, GetSession()->GetAccountId());
                         return TRAINER_SPELL_RED;
-                    }
 
                     SpellEntry const* petSpellInfo = sSpellTemplate.LookupEntry<SpellEntry>(learnedSpell);
-                    uint32 reqPetLevel = petSpellInfo ? petSpellInfo->spellLevel : 0;
-                    sLog.outError("TRAINER-DEBUG[%u]: learnedSpell %u, petSpellInfo found=%d, reqPetLevel=%u, petLevel=%u",
-                                   dbgWrapperSpell, learnedSpell, petSpellInfo != nullptr, reqPetLevel, GetPet()->GetLevel());
                     if (petSpellInfo && petSpellInfo->spellLevel > GetPet()->GetLevel())
-                    {
-                        sLog.outError("TRAINER-DEBUG[%u]: RED - learnedSpell %u, pet level %u < required spellLevel %u", dbgWrapperSpell, learnedSpell, GetPet()->GetLevel(), petSpellInfo->spellLevel);
                         return TRAINER_SPELL_RED;
-                    }
 
-                    int32 tpNeeded = GetPet()->GetTPForSpell(learnedSpell);
-                    sLog.outError("TRAINER-DEBUG[%u]: learnedSpell %u, petTP=%d, tpNeeded=%d", dbgWrapperSpell, learnedSpell, GetPet()->m_TrainingPoints, tpNeeded);
-                    if (GetPet()->m_TrainingPoints < tpNeeded)
-                    {
-                        sLog.outError("TRAINER-DEBUG[%u]: RED - learnedSpell %u, pet TP %d < needed %d", dbgWrapperSpell, learnedSpell, GetPet()->m_TrainingPoints, tpNeeded);
+                    if (GetPet()->m_TrainingPoints < GetPet()->GetTPForSpell(learnedSpell))
                         return TRAINER_SPELL_RED;
-                    }
-
-                    sLog.outError("TRAINER-DEBUG[%u]: learnedSpell %u passed pet-taught checks but !known - falling through to chain/skill checks", dbgWrapperSpell, learnedSpell);
                 }
             }
         }
 
         if (SpellChainNode const* spell_chain = sSpellMgr.GetSpellChainNode(learnedSpell))
         {
-            sLog.outError("TRAINER-DEBUG[%u]: learnedSpell %u has spell_chain node, prev=%u, req=%u",
-                           dbgWrapperSpell, learnedSpell, spell_chain->prev, spell_chain->req);
-
-            // check prev.rank requirement
-            if (spell_chain->prev && !HasSpell(spell_chain->prev))
+            // check prev.rank requirement - for a pet-taught rank this lives in the pet's spellbook, not the player's
+            if (spell_chain->prev)
             {
-                sLog.outError("TRAINER-DEBUG[%u]: RED - learnedSpell %u, player lacks spell_chain->prev %u", dbgWrapperSpell, learnedSpell, spell_chain->prev);
-                return TRAINER_SPELL_RED;
+                bool hasPrev = petTaught ? (GetPet() && GetPet()->HasSpell(spell_chain->prev)) : HasSpell(spell_chain->prev);
+                if (!hasPrev)
+                    return TRAINER_SPELL_RED;
             }
 
             // check additional spell requirement
-            if (spell_chain->req && !HasSpell(spell_chain->req) &&
-                std::find(trainer_spell->learnedSpell.begin(), trainer_spell->learnedSpell.end(), spell_chain->req) == trainer_spell->learnedSpell.end())
+            if (spell_chain->req)
             {
-                sLog.outError("TRAINER-DEBUG[%u]: RED - learnedSpell %u, player lacks spell_chain->req %u", dbgWrapperSpell, learnedSpell, spell_chain->req);
-                return TRAINER_SPELL_RED;
+                bool hasReq = petTaught ? (GetPet() && GetPet()->HasSpell(spell_chain->req)) : HasSpell(spell_chain->req);
+                if (!hasReq &&
+                    std::find(trainer_spell->learnedSpell.begin(), trainer_spell->learnedSpell.end(), spell_chain->req) == trainer_spell->learnedSpell.end())
+                    return TRAINER_SPELL_RED;
             }
         }
 
@@ -4268,35 +4239,22 @@ TrainerSpellState Player::GetTrainerSpellState(TrainerSpell const* trainer_spell
 
         // check primary prof. limit
         if (sSpellMgr.IsPrimaryProfessionFirstRankSpell(spell->Id) && GetFreePrimaryProfessionPoints() == 0)
-        {
-            sLog.outError("TRAINER-DEBUG[%u]: GREEN_DISABLED - learnedSpell %u, no free primary profession points", dbgWrapperSpell, learnedSpell);
             return TRAINER_SPELL_GREEN_DISABLED;
-        }
     }
 
     if (hasLearnSpellEffect && knowsAllLearnedSpells)
-    {
-        sLog.outError("TRAINER-DEBUG[%u]: GRAY - hasLearnSpellEffect && knowsAllLearnedSpells", dbgWrapperSpell);
         return TRAINER_SPELL_GRAY;
-    }
 
     // check skill requirement
     if (!prof || GetSession()->GetSecurity() < AccountTypes(sWorld.getConfig(CONFIG_UINT32_TRADE_SKILL_GMIGNORE_SKILL)))
         if (trainer_spell->reqSkill && GetSkillValueBase(trainer_spell->reqSkill) < trainer_spell->reqSkillValue)
-        {
-            sLog.outError("TRAINER-DEBUG[%u]: RED - reqSkill %u value %u < reqSkillValue %u", dbgWrapperSpell, trainer_spell->reqSkill, GetSkillValueBase(trainer_spell->reqSkill), trainer_spell->reqSkillValue);
             return TRAINER_SPELL_RED;
-        }
 
     for (uint32 i = 0; i < 3; ++i)
         if (trainer_spell->reqAbility[i])
             if (!HasSpell(*trainer_spell->reqAbility[i]))
-            {
-                sLog.outError("TRAINER-DEBUG[%u]: RED - missing reqAbility[%u] = %u", dbgWrapperSpell, i, *trainer_spell->reqAbility[i]);
                 return TRAINER_SPELL_RED;
-            }
 
-    sLog.outError("TRAINER-DEBUG[%u]: GREEN", dbgWrapperSpell);
     return TRAINER_SPELL_GREEN;
 }
 
