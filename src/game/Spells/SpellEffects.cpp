@@ -8007,6 +8007,13 @@ void Spell::EffectProspecting(SpellEffectIndex /*eff_idx*/)
     loot = new Loot(p_caster, itemTarget, LOOT_PROSPECTING);
 
     loot->ShowContentTo(p_caster);
+
+    // 在这里立即扣除矿石，而不是等 Loot::Release() 再扣：上面 ShowContentTo() 已经把宝石展示给玩家了，
+    // 但 Release() 只有在客户端发送"释放战利品"请求时才会执行。如果客户端没有正常发送这个请求就把
+    // 战利品窗口关掉了（比如不开自动拾取时快速双击，见 cmangos issues#3542），矿石就永远不会被消耗，
+    // 导致同一堆矿石可以被无限重复碎石。
+    uint32 count = std::min(itemTarget->GetCount(), uint32(5));
+    p_caster->DestroyItemCount(*itemTarget, count, true);
 }
 
 void Spell::EffectSkill(SpellEffectIndex /*eff_idx*/)

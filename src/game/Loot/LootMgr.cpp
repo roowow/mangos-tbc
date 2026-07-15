@@ -1343,16 +1343,11 @@ void Loot::Release(Player* player)
                 // temporary loot in stacking items, clear loot state, no auto loot move
                 case LOOT_PROSPECTING:
                 {
-                    uint32 count = m_itemTarget->GetCount();
-
-                    // >=5 checked in spell code, but will work for cheating cases also with removing from another stacks.
-                    if (count > 5)
-                        count = 5;
-
-                    // reset loot for allow repeat looting if stack > 5
+                    // 矿石已经在 Spell::EffectProspecting() 里立即扣除了，不在这里扣，这样即使战利品
+                    // 窗口没有正常发送"释放"请求就关闭了，矿石也不会残留（见 cmangos issues#3542 —
+                    // 碎石可重复利用的漏洞）。这里只需要重置战利品状态，让扣减后剩余的矿石堆叠还能继续被碎石。
                     Clear();
                     m_itemTarget->SetLootState(ITEM_LOOT_REMOVED);
-                    player->DestroyItemCount(*m_itemTarget, count, true);
                     break;
                 }
                 // temporary loot, auto loot move
