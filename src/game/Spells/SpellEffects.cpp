@@ -7994,11 +7994,6 @@ void Spell::EffectProspecting(SpellEffectIndex /*eff_idx*/)
 
     Player* p_caster = static_cast<Player*>(m_caster);
 
-    sLog.outError("PROSPECT-DEBUG[%s]: EffectProspecting enter, item guid=%u entry=%u count=%u uState=%d hasGeneratedLoot=%d hasTemporaryLoot=%d hasSavedLoot=%d",
-                  p_caster->GetGuidStr().c_str(), itemTarget->GetGUIDLow(), itemTarget->GetEntry(),
-                  itemTarget->GetCount(), int(itemTarget->GetState()),
-                  itemTarget->HasGeneratedLoot(), itemTarget->HasTemporaryLoot(), itemTarget->HasSavedLoot());
-
     if (sWorld.getConfig(CONFIG_BOOL_SKILL_PROSPECTING))
     {
         uint32 SkillValue = p_caster->GetSkillValuePure(SKILL_JEWELCRAFTING);

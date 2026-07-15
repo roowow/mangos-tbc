@@ -35,8 +35,6 @@ void WorldSession::HandleAutostoreLootItemOpcode(WorldPacket& recv_data)
 
     DEBUG_LOG("WORLD: CMSG_AUTOSTORE_LOOT_ITEM > requesting item in slot %u", uint32(itemSlot));
 
-    sLog.outError("PROSPECT-DEBUG[%s]: HandleAutostoreLootItemOpcode enter, slot=%u", _player->GetGuidStr().c_str(), uint32(itemSlot));
-
     Loot* loot = sLootMgr.GetLoot(_player);
 
     if (!loot)
@@ -47,9 +45,6 @@ void WorldSession::HandleAutostoreLootItemOpcode(WorldPacket& recv_data)
 
     ObjectGuid const& lguid = loot->GetLootGuid();
 
-    sLog.outError("PROSPECT-DEBUG[%s]: HandleAutostoreLootItemOpcode found loot, lguid=%s isItem=%d",
-                  _player->GetGuidStr().c_str(), lguid.GetString().c_str(), lguid.IsItem());
-
     LootItem* lootItem = loot->GetLootItemInSlot(itemSlot);
 
     if (!lootItem)
@@ -59,9 +54,7 @@ void WorldSession::HandleAutostoreLootItemOpcode(WorldPacket& recv_data)
         // "if (loot->IsLootedFor(_player)) loot->Release(_player);" 才关闭、走 LOOT_PROSPECTING
         // 收尾逻辑消耗矿石的。这里请求的槽位不存在（比如快速双击同一个已经被拿走的槽位），如果这个玩家
         // 其实还没拿完其他物品，就不应该在这里强行结束整个战利品会话——直接忽略这个无效请求、保持窗口开着，
-        // 让玩家继续拾取剩下的宝石；只有确实已经拿完了，才补一次 Release() 走正常收尾（见 PROSPECT-DEBUG 调查）。
-        sLog.outError("PROSPECT-DEBUG[%s]: HandleAutostoreLootItemOpcode lootItem null for slot=%u, isLootedFor=%d",
-                      _player->GetGuidStr().c_str(), uint32(itemSlot), loot->IsLootedFor(_player));
+        // 让玩家继续拾取剩下的宝石；只有确实已经拿完了，才补一次 Release() 走正常收尾。
         if (loot->IsLootedFor(_player))
             loot->Release(_player);
         return;
@@ -72,8 +65,6 @@ void WorldSession::HandleAutostoreLootItemOpcode(WorldPacket& recv_data)
     if (lootItem->isBlocked || slotType == LOOT_SLOT_VIEW || slotType == LOOT_SLOT_REQS || slotType == MAX_LOOT_SLOT_TYPE)
     {
         sLog.outDebug("HandleAutostoreLootItemOpcode> %s have no right to loot itemId(%u)", _player->GetGuidStr().c_str(), lootItem->itemId);
-        sLog.outError("PROSPECT-DEBUG[%s]: HandleAutostoreLootItemOpcode lootItem blocked/invalid slotType for slot=%u, isLootedFor=%d",
-                      _player->GetGuidStr().c_str(), uint32(itemSlot), loot->IsLootedFor(_player));
         if (loot->IsLootedFor(_player))
             loot->Release(_player);
         return;
@@ -81,19 +72,10 @@ void WorldSession::HandleAutostoreLootItemOpcode(WorldPacket& recv_data)
 
     InventoryResult result = loot->SendItem(_player, lootItem);
 
-    sLog.outError("PROSPECT-DEBUG[%s]: HandleAutostoreLootItemOpcode SendItem result=%d", _player->GetGuidStr().c_str(), int(result));
-
     if (result == EQUIP_ERR_OK && lguid.IsItem())
     {
         if (Item* item = _player->GetItemByGuid(lguid))
-        {
-            sLog.outError("PROSPECT-DEBUG[%s]: HandleAutostoreLootItemOpcode calling SetLootState(ITEM_LOOT_CHANGED) on item guid=%u count=%u uState=%d",
-                          _player->GetGuidStr().c_str(), item->GetGUIDLow(), item->GetCount(), int(item->GetState()));
             item->SetLootState(ITEM_LOOT_CHANGED);
-        }
-        else
-            sLog.outError("PROSPECT-DEBUG[%s]: HandleAutostoreLootItemOpcode lguid=%s is item type but GetItemByGuid returned null",
-                          _player->GetGuidStr().c_str(), lguid.GetString().c_str());
     }
 }
 

@@ -272,9 +272,6 @@ void Item::SaveToDB()
 
     uint32 guid = GetGUIDLow();
 
-    sLog.outError("PROSPECT-DEBUG: Item::SaveToDB guid=%u entry=%u uState=%d count=%u lootState=%d",
-                  guid, GetEntry(), int(uState), GetCount(), int(m_lootState));
-
     switch (uState)
     {
         case ITEM_NEW:
@@ -291,13 +288,11 @@ void Item::SaveToDB()
             {
                 stmt.reset(new SqlStatement(CharacterDatabase.CreateStatement(insItem, INSERT_ITEM)));
                 //printf("> Saving new item(%s) for guid[%u]. Thread is [%u]\n", GetProto()->Name1, GetOwnerGuid().GetCounter(), threadID);
-                sLog.outError("PROSPECT-DEBUG: Item::SaveToDB guid=%u will INSERT (ITEM_NEW), count=%u", guid, GetCount());
             }
             else
             {
                 stmt.reset(new SqlStatement(CharacterDatabase.CreateStatement(updItem, UPDATE_ITEM)));
                 //printf("> Updating item(%s) for guid[%u]. Thread is [%u]\n", GetProto()->Name1, GetOwnerGuid().GetCounter(), threadID);
-                sLog.outError("PROSPECT-DEBUG: Item::SaveToDB guid=%u will UPDATE (ITEM_CHANGED), count=%u", guid, GetCount());
             }
 
             stmt->addUInt32(GetOwnerGuid().GetCounter());
@@ -371,7 +366,6 @@ void Item::SaveToDB()
             return;
         }
         case ITEM_UNCHANGED:
-            sLog.outError("PROSPECT-DEBUG: Item::SaveToDB guid=%u SKIPPED (uState=ITEM_UNCHANGED), count in memory=%u NOT written to DB", guid, GetCount());
             return;
     }
 
@@ -748,9 +742,6 @@ void Item::UpdateItemSuffixFactor()
 
 void Item::SetState(ItemUpdateState state, Player* forplayer)
 {
-    sLog.outError("PROSPECT-DEBUG: Item::SetState guid=%u oldUState=%d requestedState=%d forplayer=%s inUpdateQueue(before)=%d",
-                  GetGUIDLow(), int(uState), int(state), forplayer ? forplayer->GetGuidStr().c_str() : "null", IsInUpdateQueue());
-
     if (uState == ITEM_NEW && state == ITEM_REMOVED)
     {
         // pretend the item never existed
@@ -775,9 +766,6 @@ void Item::SetState(ItemUpdateState state, Player* forplayer)
         uQueuePos = -1;
         uState = ITEM_UNCHANGED;
     }
-
-    sLog.outError("PROSPECT-DEBUG: Item::SetState guid=%u newUState=%d inUpdateQueue(after)=%d queuePos=%d",
-                  GetGUIDLow(), int(uState), IsInUpdateQueue(), int(uQueuePos));
 }
 
 void Item::AddToUpdateQueueOf(Player* player)
@@ -1205,8 +1193,6 @@ bool ItemRequiredTarget::IsFitToRequirements(Unit* pUnitTarget) const
 
 void Item::SetLootState(ItemLootUpdateState state)
 {
-    sLog.outError("PROSPECT-DEBUG: Item::SetLootState guid=%u oldLootState=%d requestedState=%d", GetGUIDLow(), int(m_lootState), int(state));
-
     // ITEM_LOOT_NONE -> ITEM_LOOT_TEMPORARY -> ITEM_LOOT_NONE
     // ITEM_LOOT_NONE -> ITEM_LOOT_NEW -> ITEM_LOOT_NONE
     // ITEM_LOOT_NONE -> ITEM_LOOT_NEW -> ITEM_LOOT_UNCHANGED [<-> ITEM_LOOT_CHANGED] -> ITEM_LOOT_REMOVED -> ITEM_LOOT_NONE
@@ -1238,17 +1224,12 @@ void Item::SetLootState(ItemLootUpdateState state)
             if (m_lootState == ITEM_LOOT_NEW || m_lootState == ITEM_LOOT_TEMPORARY)
             {
                 m_lootState = ITEM_LOOT_NONE;
-                sLog.outError("PROSPECT-DEBUG: Item::SetLootState guid=%u early-return NONE (was NEW/TEMPORARY)", GetGUIDLow());
                 return;
             }
 
             m_lootState = ITEM_LOOT_REMOVED;
             break;
     }
-
-    sLog.outError("PROSPECT-DEBUG: Item::SetLootState guid=%u finalLootState=%d willCallSetState=%d",
-                  GetGUIDLow(), int(m_lootState),
-                  (m_lootState != ITEM_LOOT_NONE && m_lootState != ITEM_LOOT_UNCHANGED && m_lootState != ITEM_LOOT_TEMPORARY));
 
     if (m_lootState != ITEM_LOOT_NONE && m_lootState != ITEM_LOOT_UNCHANGED && m_lootState != ITEM_LOOT_TEMPORARY)
         SetState(ITEM_CHANGED);
