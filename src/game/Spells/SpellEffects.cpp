@@ -7994,6 +7994,11 @@ void Spell::EffectProspecting(SpellEffectIndex /*eff_idx*/)
 
     Player* p_caster = static_cast<Player*>(m_caster);
 
+    sLog.outError("PROSPECT-DEBUG[%s]: EffectProspecting enter, item guid=%u entry=%u count=%u uState=%d hasGeneratedLoot=%d hasTemporaryLoot=%d hasSavedLoot=%d",
+                  p_caster->GetGuidStr().c_str(), itemTarget->GetGUIDLow(), itemTarget->GetEntry(),
+                  itemTarget->GetCount(), int(itemTarget->GetState()),
+                  itemTarget->HasGeneratedLoot(), itemTarget->HasTemporaryLoot(), itemTarget->HasSavedLoot());
+
     if (sWorld.getConfig(CONFIG_BOOL_SKILL_PROSPECTING))
     {
         uint32 SkillValue = p_caster->GetSkillValuePure(SKILL_JEWELCRAFTING);
@@ -8012,8 +8017,19 @@ void Spell::EffectProspecting(SpellEffectIndex /*eff_idx*/)
     // 但 Release() 只有在客户端发送"释放战利品"请求时才会执行。如果客户端没有正常发送这个请求就把
     // 战利品窗口关掉了（比如不开自动拾取时快速双击，见 cmangos issues#3542），矿石就永远不会被消耗，
     // 导致同一堆矿石可以被无限重复碎石。
+    uint32 origGuid = itemTarget->GetGUIDLow();
     uint32 count = std::min(itemTarget->GetCount(), uint32(5));
     p_caster->DestroyItemCount(*itemTarget, count, true);
+
+    // itemTarget 在数量归零时可能已经被 DestroyItemCount 整个销毁了，之后不能再直接解引用，
+    // 这里用 guid 重新安全查找一次，查不到就说明已经被完全销毁
+    if (Item* after = p_caster->GetItemByGuid(ObjectGuid(HIGHGUID_ITEM, origGuid)))
+        sLog.outError("PROSPECT-DEBUG[%s]: EffectProspecting after destroy, item guid=%u count=%u uState=%d hasGeneratedLoot=%d hasTemporaryLoot=%d hasSavedLoot=%d",
+                      p_caster->GetGuidStr().c_str(), origGuid, after->GetCount(), int(after->GetState()),
+                      after->HasGeneratedLoot(), after->HasTemporaryLoot(), after->HasSavedLoot());
+    else
+        sLog.outError("PROSPECT-DEBUG[%s]: EffectProspecting after destroy, item guid=%u fully destroyed (count reached 0)",
+                      p_caster->GetGuidStr().c_str(), origGuid);
 }
 
 void Spell::EffectSkill(SpellEffectIndex /*eff_idx*/)

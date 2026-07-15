@@ -11170,10 +11170,14 @@ void Player::DestroyItemCount(Item& item, uint32& count, bool update)
 {
     DEBUG_LOG("STORAGE: DestroyItemCount item (GUID: %u, Entry: %u) count = %u", item.GetGUIDLow(), item.GetEntry(), count);
 
+    sLog.outError("PROSPECT-DEBUG[%s]: DestroyItemCount(Item&) enter, guid=%u curCount=%u wantDestroy=%u uState=%d",
+                  GetGuidStr().c_str(), item.GetGUIDLow(), item.GetCount(), count, int(item.GetState()));
+
     if (item.GetCount() <= count)
     {
         count -= item.GetCount();
 
+        sLog.outError("PROSPECT-DEBUG[%s]: DestroyItemCount(Item&) full-remove branch, guid=%u", GetGuidStr().c_str(), item.GetGUIDLow());
         DestroyItem(item.GetBagSlot(), item.GetSlot(), update);
     }
     else
@@ -11184,6 +11188,9 @@ void Player::DestroyItemCount(Item& item, uint32& count, bool update)
         if (IsInWorld() && update)
             item.SendCreateUpdateToPlayer(this);
         item.SetState(ITEM_CHANGED, this);
+
+        sLog.outError("PROSPECT-DEBUG[%s]: DestroyItemCount(Item&) reduce branch, guid=%u newCount=%u uState=%d",
+                      GetGuidStr().c_str(), item.GetGUIDLow(), item.GetCount(), int(item.GetState()));
     }
 }
 
@@ -17111,10 +17118,15 @@ void Player::_SaveInventory()
 
     // do not save if the update queue is corrupt
     bool error = false;
+    sLog.outError("PROSPECT-DEBUG[%s]: _SaveInventory checking update queue, %u item(s) queued", GetGuidStr().c_str(), (uint32)m_itemUpdateQueue.size());
     for (auto item : m_itemUpdateQueue)
     {
         if (!item || item->GetState() == ITEM_REMOVED) continue;
         Item* test = GetItemByPos(item->GetBagSlot(), item->GetSlot());
+
+        sLog.outError("PROSPECT-DEBUG[%s]: _SaveInventory queue item guid=%u entry=%u count=%u bagSlot=%u slot=%u uState=%d -> GetItemByPos returns %s",
+                      GetGuidStr().c_str(), item->GetGUIDLow(), item->GetEntry(), item->GetCount(), item->GetBagSlot(), item->GetSlot(), int(item->GetState()),
+                      test ? (test == item ? "SAME item (ok)" : "DIFFERENT item (mismatch!)") : "nullptr (position empty!)");
 
         if (test == nullptr)
         {
@@ -17130,6 +17142,7 @@ void Player::_SaveInventory()
 
     if (error)
     {
+        sLog.outError("PROSPECT-DEBUG[%s]: _SaveInventory ABORTED - entire queued inventory save (including any legitimately-changed items like reduced ore counts) was discarded because of the mismatch(es) logged above!", GetGuidStr().c_str());
         sLog.outError("Player::_SaveInventory - one or more errors occurred save aborted!");
         ChatHandler(this).SendSysMessage(LANG_ITEM_SAVE_FAILED);
         return;
