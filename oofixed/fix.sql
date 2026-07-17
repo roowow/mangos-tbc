@@ -190,3 +190,17 @@ UPDATE game_event SET schedule_type = 11, length = 40320 WHERE entry = 1;
 -- [状态: 2026-07-12 已应用到测试库 tbcmangosdev，验证通过]
 UPDATE spell_template SET RecoveryTime = 10000 WHERE Id = 20741;
 
+-- 卡拉赞老一"午夜"(Midnight)修复：Nightingale9002 在 Nmangos-tbc 仓库 master3 分支
+-- (commit a79667498 "修复午夜") 把社区版"Modernize Attumen the Huntsman (#795)"引入的
+-- SetSpellList(SPELL_SET_PHASE_1/2 = 1615101/1615102) 阶段驱动方式回退成了旧版硬编码
+-- 计时器实现，这两条 SQL 把回退后不再被 C++ 代码引用、变成孤儿数据的这两条 spell list
+-- 记录禁用掉，避免遗留的 Position=1 条目继续生效导致技能表现异常。
+-- 需要配合 boss_midnight.cpp 的代码回退一起生效，单独执行这两条 SQL 没有意义。
+-- 同时 karazhan.cpp 里"团灭后强制刷新午夜"的逻辑也一并改了：原来的 pMidnight->Respawn()
+-- 对这台服务器的刷怪配置不起作用（午夜是走新版 SpawnManager 管理的，不是走老式定时器），
+-- 改成 pMidnight->GetMap()->GetSpawnManager().RespawnCreature(pMidnight->GetDbGuid(), 0) 直接触发。
+-- [状态: 2026-07-18 代码改动（boss_midnight.cpp 回退 + karazhan.cpp 刷新逻辑）已合并到本地仓库工作区，
+--        尚未提交/部署；这两条 SQL 需要等代码改动上线测试服验证过之后再对 DB 执行]
+UPDATE `creature_spell_list` SET `Availability` = '0' WHERE (`Id` = '1615101') and (`Position` = '1');
+UPDATE `creature_spell_list` SET `Availability` = '0' WHERE (`Id` = '1615102') and (`Position` = '1');
+

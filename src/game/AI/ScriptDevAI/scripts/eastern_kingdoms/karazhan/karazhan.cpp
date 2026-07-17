@@ -235,11 +235,14 @@ void instance_karazhan::SetData(uint32 uiType, uint32 uiData)
             m_auiEncounter[uiType] = uiData;
             if (uiData == FAIL)
             {
-                // Respawn Midnight on Fail
+                // Respawn Midnight on Fail. Midnight is despawned (not just killed) during the
+                // mount transition into Attumen the Huntsman, so it is managed by the map's
+                // SpawnManager rather than the plain respawn timer - Creature::Respawn() alone
+                // does not bring it back, it has to go through the SpawnManager directly.
                 if (Creature* pMidnight = GetSingleCreatureFromStorage(NPC_MIDNIGHT))
                 {
                     if (!pMidnight->IsAlive())
-                        pMidnight->Respawn();
+                        pMidnight->GetMap()->GetSpawnManager().RespawnCreature(pMidnight->GetDbGuid(), 0);
                 }
             }
             break;
