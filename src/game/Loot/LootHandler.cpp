@@ -50,7 +50,13 @@ void WorldSession::HandleAutostoreLootItemOpcode(WorldPacket& recv_data)
     if (!lootItem)
     {
         _player->SendEquipError(EQUIP_ERR_ITEM_NOT_FOUND, nullptr, nullptr);
-        loot->SendReleaseFor(_player);
+        // 正常情况下战利品窗口是在玩家拿完所有属于自己的物品后，靠函数末尾的
+        // "if (loot->IsLootedFor(_player)) loot->Release(_player);" 才关闭、走 LOOT_PROSPECTING
+        // 收尾逻辑消耗矿石的。这里请求的槽位不存在（比如快速双击同一个已经被拿走的槽位），如果这个玩家
+        // 其实还没拿完其他物品，就不应该在这里强行结束整个战利品会话——直接忽略这个无效请求、保持窗口开着，
+        // 让玩家继续拾取剩下的宝石；只有确实已经拿完了，才补一次 Release() 走正常收尾。
+        if (loot->IsLootedFor(_player))
+            loot->Release(_player);
         return;
     }
 
@@ -59,7 +65,8 @@ void WorldSession::HandleAutostoreLootItemOpcode(WorldPacket& recv_data)
     if (lootItem->isBlocked || slotType == LOOT_SLOT_VIEW || slotType == LOOT_SLOT_REQS || slotType == MAX_LOOT_SLOT_TYPE)
     {
         sLog.outDebug("HandleAutostoreLootItemOpcode> %s have no right to loot itemId(%u)", _player->GetGuidStr().c_str(), lootItem->itemId);
-        loot->SendReleaseFor(_player);
+        if (loot->IsLootedFor(_player))
+            loot->Release(_player);
         return;
     }
 

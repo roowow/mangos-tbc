@@ -271,6 +271,7 @@ void Item::SaveToDB()
     static const char* DELETE_LOOT = "DELETE FROM item_loot WHERE guid = ?";
 
     uint32 guid = GetGUIDLow();
+
     switch (uState)
     {
         case ITEM_NEW:

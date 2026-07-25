@@ -186,3 +186,7 @@ update tbcmangos.gameobject_template gt set gt.data1 = 0 where gt.entry in  (184
 UPDATE game_event_time SET end_time = '2099-12-31 00:00:00' WHERE entry = 1;
 UPDATE game_event SET schedule_type = 11, length = 40320 WHERE entry = 1;
 
+-- spell 20741 (Shadow Bolt Volley) 官方数据本身没有冷却时间（RecoveryTime=0），玩家心控可以放这个技能的 NPC 之后会导致 0 冷却刷怪，加一个 10 秒冷却限制
+-- [状态: 2026-07-12 已应用到测试库 tbcmangosdev，验证通过]
+UPDATE spell_template SET RecoveryTime = 10000 WHERE Id = 20741;
+
