@@ -4155,7 +4155,7 @@ TrainerSpellState Player::GetTrainerSpellState(TrainerSpell const* trainer_spell
     if (!prof || GetSession()->GetSecurity() < AccountTypes(sWorld.getConfig(CONFIG_UINT32_TRADE_SKILL_GMIGNORE_LEVEL)))
         if (GetLevel() < reqLevel)
             return TRAINER_SPELL_RED;
-    
+
     bool hasLearnSpellEffect = trainer_spell->learnedSpell.size() > 1;
     bool knowsAllLearnedSpells = true;
 
@@ -4177,9 +4177,14 @@ TrainerSpellState Player::GetTrainerSpellState(TrainerSpell const* trainer_spell
 
     for (uint32 learnedSpell : trainer_spell->learnedSpell)
     {
+        // Beast Training rank chains (e.g. Great Stamina 1/2/3/...) are auto-linked into SpellChainNode
+        // data straight from the DBC at load time (see the "N from DBC data" count in the spell chain
+        // load log), not just the spell_chain SQL table, so the prev/req check below applies even for
+        // pet abilities that have no override row in that table.
+        bool petTaught = isPetTaughtSpell(learnedSpell);
+
         if (trainer_spell->spell != learnedSpell)
         {
-            bool petTaught = isPetTaughtSpell(learnedSpell);
             bool known = petTaught ? (GetPet() && GetPet()->HasSpell(learnedSpell)) : HasSpell(learnedSpell);
             if (!known)
             {
@@ -4207,14 +4212,22 @@ TrainerSpellState Player::GetTrainerSpellState(TrainerSpell const* trainer_spell
 
         if (SpellChainNode const* spell_chain = sSpellMgr.GetSpellChainNode(learnedSpell))
         {
-            // check prev.rank requirement
-            if (spell_chain->prev && !HasSpell(spell_chain->prev))
-                return TRAINER_SPELL_RED;
+            // check prev.rank requirement - for a pet-taught rank this lives in the pet's spellbook, not the player's
+            if (spell_chain->prev)
+            {
+                bool hasPrev = petTaught ? (GetPet() && GetPet()->HasSpell(spell_chain->prev)) : HasSpell(spell_chain->prev);
+                if (!hasPrev)
+                    return TRAINER_SPELL_RED;
+            }
 
             // check additional spell requirement
-            if (spell_chain->req && !HasSpell(spell_chain->req) &&
-                std::find(trainer_spell->learnedSpell.begin(), trainer_spell->learnedSpell.end(), spell_chain->req) == trainer_spell->learnedSpell.end())
-                return TRAINER_SPELL_RED;
+            if (spell_chain->req)
+            {
+                bool hasReq = petTaught ? (GetPet() && GetPet()->HasSpell(spell_chain->req)) : HasSpell(spell_chain->req);
+                if (!hasReq &&
+                    std::find(trainer_spell->learnedSpell.begin(), trainer_spell->learnedSpell.end(), spell_chain->req) == trainer_spell->learnedSpell.end())
+                    return TRAINER_SPELL_RED;
+            }
         }
 
             // exist, already checked at loading
