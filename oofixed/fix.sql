@@ -1,4 +1,5 @@
 -- 训练假人
+-- [状态: 2026-07-05 已应用到测试库 tbcmangosdev，验证通过]
 replace into creature_template(`Entry`,`Name`,`SubName`,`IconName`,`MinLevel`,`MaxLevel`,`HeroicEntry`,`DisplayId1`,`DisplayId2`,`DisplayId3`,`DisplayId4`,`DisplayIdProbability1`,`DisplayIdProbability2`,`DisplayIdProbability3`,`DisplayIdProbability4`,`Faction`,`Scale`,`Family`,`CreatureType`,`InhabitType`,`RegenerateStats`,`RacialLeader`,`NpcFlags`,`UnitFlags`,`DynamicFlags`,`ExtraFlags`,`CreatureTypeFlags`,`StaticFlags1`,`StaticFlags2`,`StaticFlags3`,`StaticFlags4`,`SpeedWalk`,`SpeedRun`,`Detection`,`CallForHelp`,`Pursuit`,`Leash`,`Timeout`,`UnitClass`,`Rank`,`Expansion`,`HealthMultiplier`,`PowerMultiplier`,`DamageMultiplier`,`DamageVariance`,`ArmorMultiplier`,`ExperienceMultiplier`,`StrengthMultiplier`,`AgilityMultiplier`,`StaminaMultiplier`,`IntellectMultiplier`,`SpiritMultiplier`,`MinLevelHealth`,`MaxLevelHealth`,`MinLevelMana`,`MaxLevelMana`,`MinMeleeDmg`,`MaxMeleeDmg`,`MinRangedDmg`,`MaxRangedDmg`,`Armor`,`MeleeAttackPower`,`RangedAttackPower`,`MeleeBaseAttackTime`,`RangedBaseAttackTime`,`DamageSchool`,`MinLootGold`,`MaxLootGold`,`LootId`,`PickpocketLootId`,`SkinningLootId`,`KillCredit1`,`KillCredit2`,`MechanicImmuneMask`,`SchoolImmuneMask`,`ResistanceHoly`,`ResistanceFire`,`ResistanceNature`,`ResistanceFrost`,`ResistanceShadow`,`ResistanceArcane`,`PetSpellDataId`,`MovementType`,`TrainerType`,`TrainerSpell`,`TrainerClass`,`TrainerRace`,`TrainerTemplateId`,`VendorTemplateId`,`EquipmentTemplateId`,`GossipMenuId`,`InteractionPauseTimer`,`CorpseDecay`,`SpellList`,`CharmedSpellList`,`StringId1`,`StringId2`,`AIName`,`ScriptName`) values 
     (94952,'超级训练假人',null,null,'73','73',0,3019,0,0,0,100,0,0,0,1095,1,'0','9','3','14','0','0','0','0','131074','0','256','0','0','0',1,1,'18','0','15000','0','0','1','0','0',110,1,1,1,1.33333,1,1,1,1,1,1,'1000000','1000000','0','0',0,0,0,0,0,'0',0,'0','0','0',0,0,0,0,0,'0','0','0','0',0,0,0,0,0,0,0,'0','0',0,'0','0',0,0,0,0,-1,'0',0,0,'0','0','','')
   , (94953,'高级训练假人',null,null,'50','50',0,3019,0,0,0,100,0,0,0,1095,1,'0','9','3','14','0','0','0','0','131074','0','256','0','0','0',1,1,'18','0','15000','0','0','1','0','0',330,1,1,1,1.33333,1,1,1,1,1,1,'1000000','1000000','0','0',0,0,0,0,0,'0',0,'0','0','0',0,0,0,0,0,'0','0','0','0',0,0,0,0,0,0,0,'0','0',0,'0','0',0,0,0,0,-1,'0',0,0,'0','0','','')
@@ -20,14 +21,19 @@ replace into creature(id,map,`spawnMask`,position_x,position_y,position_z,orient
 
 
 -- 玛拉顿节杖不能完成的问题
+-- [状态: 2026-07-05 已应用到测试库 tbcmangosdev，验证通过；原文件缺少下面第二条 "Despawn Self on Use" 脚本，对照生产库补全]
 UPDATE `gameobject_template` SET `flags` = '64' WHERE `gameobject_template`.`entry` = 178963;
 replace INTO dbscripts_on_go_template_use (`id`, `delay`, `priority`, `command`, `datalong`, `comments`)
 VALUES (178965, 6000, 0, 15, 21917, 'Incantation of Celebras - cast quest complete spell');
+replace INTO dbscripts_on_go_template_use (`id`, `delay`, `priority`, `command`, `datalong`, `comments`)
+VALUES (178965, 3500, 0, 40, 0, 'Incantation of Celebras - Despawn Self on Use');
 
 -- 科卡尔召雷师不应该触发 召唤维罗戈
+-- [状态: 2026-07-05 已应用到测试库 tbcmangosdev，验证通过]
 delete from creature_ai_scripts cas where cas.id = 327306 and cas.creature_id = 3273;
 
 -- 诅咒之地增加黑色屠戮者
+-- [状态: 2026-07-05 已应用到测试库 tbcmangosdev，验证通过，30 个刷新点与生产库一致]
 DELETE from creature where id = 5982;
 REPLACE INTO creature(id,map,`spawnMask`,position_x,position_y,position_z,orientation,spawntimesecsmin,spawntimesecsmax,spawndist,`MovementType`) values 
     (5982,0,'1',-11489.70000000000000000000,-3277.69000000000000000000,12.84230000000000000000,1.07379000000000000000,'300','300',5,'1')
@@ -63,12 +69,14 @@ REPLACE INTO creature(id,map,`spawnMask`,position_x,position_y,position_z,orient
 
 
 -- 修复费伍德换药膏任务 第一次任务都正常给经验
+-- [状态: 2026-07-05 检查测试库 tbcmangosdev，两组 entry 的 RewMoneyMaxLevel 已经是目标值，无需重复执行]
 update quest_template qt SET qt.RewMoneyMaxLevel = 3660 where qt.entry in (5882,5883,5884,5885,5886,5887,5888,5889,5890,5891) ;
 -- 后续任务都不给经验
 update quest_template qt SET qt.RewMoneyMaxLevel = 0 where qt.entry in (4103,4104,4105,4106,4107,4108,4109,4110,4111,4112) ;
 
 
 -- 奥山装备 加声望 道具限制
+-- [状态: 2026-07-05 检查测试库 tbcmangosdev，58 条 ExtendedCost 已经和生产库一致，无需重复执行]
 UPDATE npc_vendor_template SET ExtendedCost=702  WHERE entry=512 and item= 19308;
 UPDATE npc_vendor_template SET ExtendedCost=702  WHERE entry=512 and item= 19309;
 UPDATE npc_vendor_template SET ExtendedCost=702  WHERE entry=512 and item= 19310;
@@ -129,37 +137,52 @@ UPDATE npc_vendor_template SET ExtendedCost=497  WHERE entry=512 and item= 19102
 UPDATE npc_vendor_template SET ExtendedCost=496  WHERE entry=512 and item= 19104;
 
 -- 任务10861 两个模型 数据都不对
+-- [状态: 2026-07-05 已应用到测试库 tbcmangosdev，验证通过]
 UPDATE `gameobject_template` SET `data1` = '10861' WHERE `gameobject_template`.`entry` = 185210;
 UPDATE `gameobject_template` SET `data1` = '10861' WHERE `gameobject_template`.`entry` = 185211;
 
--- 任务11145
+-- 任务 11145
+-- [状态: 2026-07-05 已应用到测试库 tbcmangosdev，验证通过]
 UPDATE `gameobject_template` SET `data2` = '24618320' WHERE `gameobject_template`.`entry` = 186287;
 
 -- 任务 9667=
+-- [状态: 2026-07-05 已应用到测试库 tbcmangosdev，验证通过]
 UPDATE `gameobject_template` SET `data2` = '1966080' WHERE `gameobject_template`.`entry` = 181928;
 
--- 修复银月城 某个npc 应该同时售卖道具 和 教授技能 ，现在只售卖道具。 
+-- 修复银月城 某个npc 应该同时售卖道具 和 教授技能 ，现在只售卖道具。
+-- [状态: 2026-07-05 检查测试库 tbcmangosdev，TrainerTemplateId/VendorTemplateId 已经和生产库一致，无需重复执行]
 DELETE from creature_template where entry = 16366 or entry = 16367;
 replace INTO `creature_template` (`Entry`, `Name`, `SubName`, `IconName`, `MinLevel`, `MaxLevel`, `HeroicEntry`, `DisplayId1`, `DisplayId2`, `DisplayId3`, `DisplayId4`, `DisplayIdProbability1`, `DisplayIdProbability2`, `DisplayIdProbability3`, `DisplayIdProbability4`, `Faction`, `Scale`, `Family`, `CreatureType`, `InhabitType`, `RegenerateStats`, `RacialLeader`, `NpcFlags`, `UnitFlags`, `DynamicFlags`, `ExtraFlags`, `CreatureTypeFlags`, `StaticFlags1`, `StaticFlags2`, `StaticFlags3`, `StaticFlags4`, `SpeedWalk`, `SpeedRun`, `Detection`, `CallForHelp`, `Pursuit`, `Leash`, `Timeout`, `UnitClass`, `Rank`, `Expansion`, `HealthMultiplier`, `PowerMultiplier`, `DamageMultiplier`, `DamageVariance`, `ArmorMultiplier`, `ExperienceMultiplier`, `StrengthMultiplier`, `AgilityMultiplier`, `StaminaMultiplier`, `IntellectMultiplier`, `SpiritMultiplier`, `MinLevelHealth`, `MaxLevelHealth`, `MinLevelMana`, `MaxLevelMana`, `MinMeleeDmg`, `MaxMeleeDmg`, `MinRangedDmg`, `MaxRangedDmg`, `Armor`, `MeleeAttackPower`, `RangedAttackPower`, `MeleeBaseAttackTime`, `RangedBaseAttackTime`, `DamageSchool`, `MinLootGold`, `MaxLootGold`, `LootId`, `PickpocketLootId`, `SkinningLootId`, `KillCredit1`, `KillCredit2`, `MechanicImmuneMask`, `SchoolImmuneMask`, `ResistanceHoly`, `ResistanceFire`, `ResistanceNature`, `ResistanceFrost`, `ResistanceShadow`, `ResistanceArcane`, `PetSpellDataId`, `MovementType`, `TrainerType`, `TrainerSpell`, `TrainerClass`, `TrainerRace`, `TrainerTemplateId`, `VendorTemplateId`, `EquipmentTemplateId`, `GossipMenuId`, `InteractionPauseTimer`, `CorpseDecay`, `SpellList`, `CharmedSpellList`, `StringId1`, `StringId2`, `AIName`, `ScriptName`) VALUES
 (16366, 'Sempstress Ambershine', 'Tailoring Trainer', NULL, 15, 15, 0, 16133, 0, 0, 0, 100, 0, 0, 0, 1604, 1, 0, 7, 3, 14, 0, 145, 37376, 0, 65538, 0, 2, 0, 0, 0, 1.125, 1.14286, 18, 0, 15000, 0, 0, 8, 0, 0, 1.05, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 174, 174, 790, 790, 26, 31, 0, 0, 363, 13, 100, 2000, 2000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 0, 0, 0, 1080, 140, 0, 0, -1, 0, 0, 0, 0, 0, '', ''),
 (16367, 'Botanist Tyniarrel', 'Herbalism Trainer & Supplies', NULL, 15, 15, 0, 16134, 0, 0, 0, 100, 0, 0, 0, 1604, 1, 0, 7, 3, 14, 0, 145, 4608, 0, 65538, 0, 2, 0, 0, 0, 1.125, 1.14286, 18, 0, 15000, 0, 0, 8, 0, 0, 1.05, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 174, 174, 790, 790, 26, 31, 0, 0, 363, 13, 100, 2000, 2000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 0, 0, 0, 1030, 128, 16367, 0, -1, 0, 0, 0, 0, 0, '', '');
 
 -- 任务 891
+-- [状态: 2026-07-05 已应用到测试库 tbcmangosdev，验证通过]
 UPDATE `quest_template` SET `ReqItemId1` = '0', `ReqItemId4` = '5078', `ReqItemCount1` = '0', `ReqItemCount4` = '10', `ReqCreatureOrGOId1` = '3393', `ReqCreatureOrGOId2` = '3455', `ReqCreatureOrGOId3` = '3454', `ReqCreatureOrGOId4` = '0', `ReqCreatureOrGOCount1` = '1', `ReqCreatureOrGOCount4` = '0' WHERE `quest_template`.`entry` = 891;
 -- 任务 9418
+-- [状态: 2026-07-05 已应用到测试库 tbcmangosdev，验证通过]
 UPDATE `spell_template` SET `Effect1` = '33' WHERE `spell_template`.`Id` = 29764;
 UPDATE `gameobject_template` SET `type` = '2', `faction` = '35', `data0` = '0', `data3` = '10219', `data22` = '0' WHERE `gameobject_template`.`entry` = 181606;
 
 -- 任务9164
+-- [状态: 2026-07-05 quest_template 部分已应用到测试库 tbcmangosdev，验证通过；locales_quest 翻译部分之前汉化同步时已经带过来了，无需重复执行]
 UPDATE quest_template SET ReqItemId3 = 0, ReqItemId4 = 22628, ReqItemCount3 = 0, ReqItemCount4 = 1, ReqCreatureOrGOId3=16209,ReqCreatureOrGOId4=0,ReqCreatureOrGOCount3 = 1, ReqCreatureOrGOCount4 = 0 WHERE entry= 9164;
 UPDATE locales_quest lq SET lq.ObjectiveText3_loc4="营救游侠维多兰",lq.ObjectiveText4_loc4=""  WHERE entry = 9164;
 
 -- 任务 10911 刀锋山邪能火炮不能被控制
+-- [状态: 2026-07-05 已应用到测试库 tbcmangosdev，验证通过]
 UPDATE `creature_template` SET `StaticFlags3` = '0' WHERE `creature_template`.`Entry` = 22443;
 
 -- 任务 4513 在4512完成后npc的事件无法正常完成，导致4513无法接到， 修改方式：去掉npc事件 ，简化为交完4512后可以直接接取4513
+-- [状态: 2026-07-05 已应用到测试库 tbcmangosdev，验证通过]
 update tbcmangos.quest_template q set q.CompleteScript = 0 where q.entry = 4512;
 
 -- 卡拉赞梦魇门不开的问题
+-- [状态: 2026-07-05 检查测试库 tbcmangosdev，data1 已经和生产库一致（都是0），无需重复执行]
 update tbcmangos.gameobject_template gt set gt.data1 = 0 where gt.entry in  (184274, 184280);
+
+-- 火焰节 (Midsummer Fire Festival, game_event 1) 逐年漂移+过期问题，另外详细分析见 CustomUpdate.md
+-- [状态: 2026-07-05 已应用到测试库 tbcmangosdev，验证通过。注意：world 库每次重装/重置会被还原回原始状态，需要重新执行]
+UPDATE game_event_time SET end_time = '2099-12-31 00:00:00' WHERE entry = 1;
+UPDATE game_event SET schedule_type = 11, length = 40320 WHERE entry = 1;
 
