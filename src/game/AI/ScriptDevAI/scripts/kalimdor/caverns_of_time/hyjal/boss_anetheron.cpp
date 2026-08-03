@@ -193,6 +193,7 @@ struct boss_anetheronAI : public CombatAI
     }
 };
 
+// 31298 - Sleep
 struct AnetheronSleep : public SpellScript
 {
     bool OnCheckTarget(const Spell* spell, Unit* target, SpellEffectIndex /*eff*/) const
