@@ -134,6 +134,39 @@ void WorldSession::HandleUseItemOpcode(WorldPacket& recvPacket)
         }
     }
 
+    // DualTalent 魂器 34646
+    std::string tname;
+    if (pItem->GetEntry() == 34646)
+    {
+        PlayerMenu* pMenu = _player->GetPlayerMenu();
+        pMenu->ClearMenus();
+
+        int talentscount = 0;
+        for (auto i = pUser->oowowInfo.DualTalents.begin(); i != pUser->oowowInfo.DualTalents.end(); i++)
+        {
+            if (i->first == pUser->ActiveTalent())
+            {
+                std::string msg = std::string("|cFFFF0000灵魂 ") + std::to_string(i->first) + std::string(" - ") +  i->second + std::string("|r ");
+                pMenu->GetGossipMenu().AddMenuItem(2, msg.c_str(), 1, 99, "", 0); // active talent
+            }
+            else
+            {
+                std::string msg = std::string("灵魂 ") + std::to_string(i->first) + std::string(" - ") + i->second;
+                pMenu->GetGossipMenu().AddMenuItem(3, msg.c_str(), 1, i->first, "", 0); // inactive talent
+            }
+
+            talentscount++;
+        }
+
+        if (talentscount < 9)
+            pMenu->GetGossipMenu().AddMenuItem(4, "分裂灵魂", 1, 21, "输入灵魂标签", 50000, 1);
+
+        if (!talentscount)
+            pMenu->GetGossipMenu().AddMenuItem(9, "关闭", 1, 999, "", 0, 0);
+
+        pMenu->SendGossipMenu(22011, itemGuid);
+    }
+
     SpellCastTargets targets;
 
     recvPacket >> targets.ReadForCaster(pUser);

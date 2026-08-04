@@ -239,6 +239,12 @@ struct PlayerCreateInfoSkill
 
 typedef std::list<PlayerCreateInfoSkill> PlayerCreateInfoSkills;
 
+struct OOWOWInfo
+{
+    uint32 activeTalent = 0;
+    std::map<int8, std::string> DualTalents;
+};
+
 struct PlayerInfo
 {
     // existence checked by displayId != 0             // existence checked by displayId != 0
@@ -715,6 +721,7 @@ enum PlayerLoginQueryIndex
     PLAYER_LOGIN_QUERY_LOADMAILEDITEMS,
     PLAYER_LOGIN_QUERY_LOADWEEKLYQUESTSTATUS,
     PLAYER_LOGIN_QUERY_LOADMONTHLYQUESTSTATUS,
+    PLAYER_LOGIN_QUERY_DUALTALENT, /// DualTalent
 
     MAX_PLAYER_LOGIN_QUERY
 };
@@ -1526,8 +1533,16 @@ class Player : public Unit
         bool resetTalents(bool no_cost = false);
         uint32 resetTalentsCost() const;
         void InitTalentForLevel();
-        void LearnTalent(uint32 talentId, uint32 talentRank);
+        bool LearnTalent(uint32 talentId, uint32 talentRank);
         uint32 CalculateTalentsPoints() const;
+
+        // DualTalent
+        uint32 ActiveTalent() const { return oowowInfo.activeTalent; }
+        void SetActiveTalent(uint32 talent);
+        bool IsAllowSwitchTalent();
+        void SwitchTalent(uint32 talent);
+        bool AddTalent(std::string name);
+        bool DeleteTalent(uint32 talent);
 
         uint32 GetFreePrimaryProfessionPoints() const { return GetUInt32Value(PLAYER_CHARACTER_POINTS2); }
         void SetFreePrimaryProfessions(uint16 profs) { SetUInt32Value(PLAYER_CHARACTER_POINTS2, profs); }
@@ -2299,6 +2314,8 @@ class Player : public Unit
         void SetHighestAmmoMod(int32 amount) { m_highestAmmoMod = amount; }
 
         void UpdateRangedWeaponDependantAmmoHasteAura();
+
+        OOWOWInfo oowowInfo;
     protected:
         /*********************************************************/
         /***               BATTLEGROUND SYSTEM                 ***/

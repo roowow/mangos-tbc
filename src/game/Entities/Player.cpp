@@ -15044,6 +15044,20 @@ bool Player::LoadFromDB(ObjectGuid guid, SqlQueryHolder* holder)
         m_items[slot] = nullptr;
     }
 
+    /// DualTalent
+    std::unique_ptr<QueryResult> dresult = holder->GetResult(PLAYER_LOGIN_QUERY_DUALTALENT);
+    if (dresult)
+    {
+        do
+        {
+            Field* fields = dresult->Fetch();
+            oowowInfo.DualTalents[fields[0].GetUInt32()] = fields[1].GetString();
+            if (fields[2].GetUInt32())
+                oowowInfo.activeTalent = fields[0].GetUInt32();
+        }
+        while (dresult->NextRow());
+    }
+
     DEBUG_FILTER_LOG(LOG_FILTER_PLAYER_STATS, "Load Basic value of player %s is: ", m_name.c_str());
     outDebugStatsValues();
 
@@ -21365,29 +21379,29 @@ void Player::HandleFall(MovementInfo const& movementInfo)
     }
 }
 
-void Player::LearnTalent(uint32 talentId, uint32 talentRank)
+bool Player::LearnTalent(uint32 talentId, uint32 talentRank)
 {
     uint32 CurTalentPoints = GetFreeTalentPoints();
 
     if (CurTalentPoints == 0)
-        return;
+        return false;
 
     if (talentRank >= MAX_TALENT_RANK)
-        return;
+        return false;
 
     TalentEntry const* talentInfo = sTalentStore.LookupEntry(talentId);
 
     if (!talentInfo)
-        return;
+        return false;
 
     TalentTabEntry const* talentTabInfo = sTalentTabStore.LookupEntry(talentInfo->TalentTab);
 
     if (!talentTabInfo)
-        return;
+        return false;
 
     // prevent learn talent for different class (cheating)
     if ((getClassMask() & talentTabInfo->ClassMask) == 0)
-        return;
+        return false;
 
     // find current max talent rank
     uint32 curtalent_maxrank = 0;
@@ -21402,11 +21416,11 @@ void Player::LearnTalent(uint32 talentId, uint32 talentRank)
 
     // we already have same or higher talent rank learned
     if (curtalent_maxrank >= (talentRank + 1))
-        return;
+        return false;
 
     // check if we have enough talent points
     if (CurTalentPoints < (talentRank - curtalent_maxrank + 1))
-        return;
+        return false;
 
     // Check if it requires another talent
     if (talentInfo->DependsOn > 0)
@@ -21422,13 +21436,13 @@ void Player::LearnTalent(uint32 talentId, uint32 talentRank)
             }
 
             if (!hasEnoughRank)
-                return;
+                return false;
         }
     }
 
     // Check if it requires spell
     if (talentInfo->DependsOnSpell && !HasSpell(talentInfo->DependsOnSpell))
-        return;
+        return false;
 
     // Find out how many points we have in this field
     uint32 spentPoints = 0;
@@ -21462,23 +21476,24 @@ void Player::LearnTalent(uint32 talentId, uint32 talentRank)
 
     // not have required min points spent in talent tree
     if (spentPoints < (talentInfo->Row * MAX_TALENT_RANK))
-        return;
+        return false;
 
     // spell not set in talent.dbc
     uint32 spellid = talentInfo->RankID[talentRank];
     if (spellid == 0)
     {
         sLog.outError("Talent.dbc have for talent: %u Rank: %u spell id = 0", talentId, talentRank);
-        return;
+        return false;
     }
 
     // already known
     if (HasSpell(spellid))
-        return;
+        return false;
 
     // learn! (other talent ranks will unlearned at learning)
     learnSpell(spellid, false, true);
     DETAIL_LOG("TalentID: %u Rank: %u Spell: %u\n", talentId, talentRank, spellid);
+    return true;
 }
 
 void Player::UpdateFallInformationIfNeed(MovementInfo const& minfo, uint16 opcode)
@@ -22371,6 +22386,118 @@ void Player::UpdateRangedWeaponDependantAmmoHasteAura()
             ApplyAttackTimePercentMod(RANGED_ATTACK, float(highest), true);
         SetHighestAmmoMod(highest);
     }
+}
+
+//// DualTalent
+void Player::SetActiveTalent(uint32 talent)
+{
+    oowowInfo.activeTalent = talent;
+
+    CharacterDatabase.PExecute("UPDATE character_spell_talent SET active = 0 WHERE guid = %u", GetGUIDLow());
+
+    CharacterDatabase.PExecute("UPDATE character_spell_talent SET active = 1 WHERE guid = %u and flag = %u", GetGUIDLow(), talent);
+}
+
+bool Player::IsAllowSwitchTalent()
+{
+    // 虚弱
+    if (HasAura(15007))
+    {
+        ChatHandler(this).SendSysMessage("虚弱时无法凝聚灵魂。");
+        return false;
+    }
+
+    // 战斗中
+    if (IsInCombat())
+    {
+        ChatHandler(this).SendSysMessage("战斗中无法凝聚灵魂。");
+        return false;
+    }
+
+    // 战场
+    if (InBattleGround())
+    {
+        ChatHandler(this).SendSysMessage("战场里无法凝聚灵魂。");
+        return false;
+    }
+
+    return true;
+}
+
+void Player::SwitchTalent(uint32 talent)
+{
+    if (! IsAllowSwitchTalent())
+        return;
+
+    resetTalents(true);
+
+    std::unique_ptr<QueryResult> tresult = CharacterDatabase.PQuery("SELECT talentid, rank from character_spell_extra WHERE flag = %u and guid = %u order by id", talent, GetGUIDLow());
+    if (tresult)
+    {
+        do
+        {
+            Field* fields = tresult->Fetch();
+            LearnTalent(fields[0].GetUInt32(), fields[1].GetUInt32());
+        }
+        while (tresult->NextRow());
+    }
+
+    SetActiveTalent(talent);
+
+    CastSpell(this, 14867, TRIGGERED_OLD_TRIGGERED);                  // spell: "Untalent Visual Effect"
+
+
+    // -- 怒气/能量/法力清零
+    SetHealth(GetHealth() * 0.1); // 10% health
+    SetPower(POWER_MANA, 0);
+    SetPower(POWER_RAGE, 0);
+    SetPower(POWER_ENERGY, 0);
+
+    TextEmote("重新凝聚了灵魂，此刻非常的虚弱。");
+}
+
+bool Player::AddTalent(std::string name)
+{
+    if (! IsAllowSwitchTalent())
+        return false;
+
+    for (int i = 1; i < 20; i++) {
+        if (oowowInfo.DualTalents.count(i))
+            continue;
+
+        // 用转义 + 参数化拼接代替原来的手工字符串拼接，避免灵魂标签里的引号/特殊字符造成 SQL 注入
+        std::string escapedName = name;
+        CharacterDatabase.escape_string(escapedName);
+        CharacterDatabase.PExecute("INSERT INTO `character_spell_talent` (`Flag`, `Guid`, `name`) VALUES ('%d', '%u', '%s')",
+                                    i, GetGUIDLow(), escapedName.c_str());
+
+        oowowInfo.DualTalents[i] = name;
+
+        SwitchTalent(i);
+        break;
+    }
+
+    ModifyMoney(-5*100*100);
+
+    return true;
+}
+
+bool Player::DeleteTalent(uint32 talent)
+{
+    if (! IsAllowSwitchTalent())
+        return false;
+
+    CharacterDatabase.PExecute("DELETE FROM `character_spell_talent` WHERE guid = %u and flag = %u", GetGUIDLow(), talent);
+    CharacterDatabase.PExecute("DELETE FROM `character_spell_extra`  WHERE guid = %u and flag = %u", GetGUIDLow(), talent);
+    CharacterDatabase.PExecute("DELETE FROM `character_spell_tmp`    WHERE guid = %u and flag = %u", GetGUIDLow(), talent);
+
+    oowowInfo.DualTalents.erase(talent);
+
+    CastSpell(this, 14867, TRIGGERED_OLD_TRIGGERED);                  // spell: "Untalent Visual Effect"
+
+    TextEmote("收回了一部分灵魂，此刻非常的兴奋。");
+
+    return true;
 }
 
 bool Player::SetStunnedByLogout(bool apply)

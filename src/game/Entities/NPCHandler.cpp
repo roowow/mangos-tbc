@@ -307,7 +307,7 @@ void WorldSession::HandleTrainerBuySpellOpcode(WorldPacket& recv_data)
     }
     else
     {
-        // ³èÎï£ºÖ»ÓÃÀ´È¡¿ÉÄÜµÄµÈ¼¶£¬Ê§°Ü²»À¹½Ø
+        // ï¿½ï¿½ï¿½ï£ºÖ»ï¿½ï¿½ï¿½ï¿½È¡ï¿½ï¿½ï¿½ÜµÄµÈ¼ï¿½ï¿½ï¿½Ê§ï¿½Ü²ï¿½ï¿½ï¿½ï¿½ï¿½
         _player->IsSpellFitByClassAndRace(trainer_spell->spell, &reqLevel);
     }
 
@@ -325,7 +325,7 @@ void WorldSession::HandleTrainerBuySpellOpcode(WorldPacket& recv_data)
         if (_player->GetTrainerSpellState(trainer_spell, reqLevel) != TRAINER_SPELL_GREEN)
             return;
     }
-    // ×¢Òâ£ºÕâÀï²»ÒªÔÙÐ´Ò»±é GetTrainerSpellState
+    // ×¢ï¿½â£ºï¿½ï¿½ï¿½ï²»Òªï¿½ï¿½Ð´Ò»ï¿½ï¿½ GetTrainerSpellState
 
     // apply reputation discount
     uint32 nSpellCost = uint32(floor(trainer_spell->spellCost * _player->GetReputationPriceDiscount(unit)));
@@ -345,7 +345,7 @@ void WorldSession::HandleTrainerBuySpellOpcode(WorldPacket& recv_data)
 
     if (isPetTrainer)
     {
-        // ÁÔÈË±ØÐëÑ§»á½Ì·¨Êõ±¾Éí£¨4195£©£¬Beast Training ²Å¿´µÃµ½
+        // ï¿½ï¿½ï¿½Ë±ï¿½ï¿½ï¿½Ñ§ï¿½ï¿½Ì·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½4195ï¿½ï¿½ï¿½ï¿½Beast Training ï¿½Å¿ï¿½ï¿½Ãµï¿½
         if (!_player->HasSpell(trainer_spell->spell))
             _player->learnSpell(trainer_spell->spell, false);
 
@@ -450,6 +450,49 @@ void WorldSession::HandleGossipSelectOptionOpcode(WorldPacket& recv_data)
 
         if (!sScriptDevAIMgr.OnGossipSelect(_player, pGo, sender, action, code.empty() ? nullptr : code.c_str()))
             _player->OnGossipSelect(pGo, gossipListId, menuId);
+    }
+    else if (guid.IsItem())
+    {
+        // DualTalent é­‚å™¨ 34646
+        std::string tname;
+        Item* item = GetPlayer()->GetItemByGuid(guid);
+        if (item && item->GetEntry() == 34646)
+        {
+            PlayerMenu* pMenu = _player->GetPlayerMenu();
+            pMenu->ClearMenus();
+
+            switch (action)
+            {
+                case 1 ... 19:
+                    pMenu->GetGossipMenu().AddMenuItem(2, "åˆ‡æ¢çµé­‚", 1, 200+action, "ç¡®å®šåˆ‡æ¢çµé­‚", 0, 0);
+                    // pMenu->GetGossipMenu().AddMenuItem(9, "å¿˜è®°çµé­‚", 2, 300+action, "ç¡®å®šå¿˜è®°çµé­‚", 0, 0);
+                    pMenu->SendGossipMenu(22012, guid);
+                    break;
+                // case 20:
+                //     pMenu->GetGossipMenu().AddMenuItem(1, "åˆ†è£‚çµé­‚", 2, 21, "è¾“å…¥çµé­‚æ ‡ç­¾", 0, 1);
+                //     pMenu->GetGossipMenu().AddMenuItem(9, "å…³é—­", 1, 999, "", 0, 0);
+                //     pMenu->SendGossipMenu(22012, guid);
+                //     break;
+                case 21:
+                    if (code.empty() || code.length() > 20)
+                        break;
+
+                    _player->AddTalent(code);
+                    pMenu->CloseGossip();
+                    break;
+                case 200 ... 219:
+                    _player->SwitchTalent(action-200);
+                    pMenu->CloseGossip();
+                    break;
+                case 300 ... 319:
+                    _player->DeleteTalent(action-300);
+                    pMenu->CloseGossip();
+                    break;
+                case 999:
+                    pMenu->CloseGossip();
+                    break;
+            }
+        }
     }
 }
 
