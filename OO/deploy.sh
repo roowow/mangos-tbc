@@ -3,8 +3,10 @@
 # Deploy script: pull latest source, rebuild, reinstall, swap in the renamed
 # binary, and gracefully restart the running server.
 #
-# Usage:
-#   ./deploy.sh
+# All paths are hardcoded absolute paths (see CMANGOS_DIR below), so this can
+# be invoked from any working directory, e.g.:
+#   bash /home/rogical/cmangos/mangos-tbc/OO/deploy.sh
+#   bash ~/cmangos/mangos-tbc/OO/deploy.sh
 #
 # Mirrors the manual steps:
 #   cd cmangos/mangos-tbc && git pull <remote> <branch>
@@ -14,15 +16,16 @@
 #
 # Remote/branch are configurable so this works with either the upstream repo
 # checkout (origin) or a fork tracked under a different remote name, e.g.:
-#   ./deploy.sh                              # uses defaults below (roowow v3)
-#   GIT_REMOTE=origin GIT_BRANCH=master ./deploy.sh
+#   bash OO/deploy.sh                        # uses defaults below (roowow v3)
+#   GIT_REMOTE=origin GIT_BRANCH=master bash OO/deploy.sh
 
 set -euo pipefail
 
-THIS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-
-MANGOS_TBC_DIR="$THIS_DIR"
-CMANGOS_DIR="$(cd "$MANGOS_TBC_DIR/.." && pwd -P)"
+# Hardcoded absolute paths so this script can be run from any working
+# directory (bash /path/to/deploy.sh, a cron job, etc.) without relying on
+# where the script file itself happens to live.
+CMANGOS_DIR="/home/rogical/cmangos"
+MANGOS_TBC_DIR="$CMANGOS_DIR/mangos-tbc"
 BUILD_DIR="$CMANGOS_DIR/build"
 BIN_DIR="$CMANGOS_DIR/run/bin"
 WOWADMIN="$CMANGOS_DIR/wowadmin.sh"
