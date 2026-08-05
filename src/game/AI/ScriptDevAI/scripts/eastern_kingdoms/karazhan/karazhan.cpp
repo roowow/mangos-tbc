@@ -266,6 +266,8 @@ void instance_karazhan::SetData(uint32 uiType, uint32 uiData)
                 DoUseDoorOrButton(GO_STAGE_DOOR_RIGHT);
                 DoToggleGameObjectFlags(GO_SERVANTS_ACCESS_DOOR, GO_FLAG_LOCKED, false);
                 DoToggleGameObjectFlags(GO_SIDE_ENTRANCE_DOOR, GO_FLAG_LOCKED, false);
+                DoUseDoorOrButton(GO_MASTERS_TERRACE_DOOR_1);
+                DoUseDoorOrButton(GO_MASTERS_TERRACE_DOOR_2);
             }
             // use curtain only for event start or fail
             else
