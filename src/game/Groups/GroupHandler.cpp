@@ -953,6 +953,7 @@ void WorldSession::HandleGroupSwapSubGroupOpcode(WorldPacket& recv_data)
     if (subgroup1 == subgroup2)
         return;
 
-    group->ChangeMembersGroup(guid1, subgroup2);
+    // avoid sending SMSG_GROUP_LIST twice for a single swap (client crashes on a second update it doesn't expect)
+    group->ChangeMembersGroup(guid1, subgroup2, false);
     group->ChangeMembersGroup(guid2, subgroup1);
 }
