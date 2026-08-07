@@ -2747,12 +2747,18 @@ void Unit::CalculateAbsorbResistBlock(Unit* caster, SpellNonMeleeDamage* spellDa
         spellDamageInfo->damage -= spellDamageInfo->blocked;
     }
 
+    uint32 preMitigationDamage = spellDamageInfo->damage;
+
     CalculateDamageAbsorbAndResist(caster, spellDamageInfo->schoolMask, SPELL_DIRECT_DAMAGE, spellDamageInfo->damage, &spellDamageInfo->absorb, &spellDamageInfo->resist, IsReflectableSpell(spellProto), IsResistableSpell(spellProto) && !spellProto->HasAttribute(SPELL_ATTR_EX5_NO_PARTIAL_RESISTS), IsBinarySpell(*spellProto));
 
     const uint32 bonus = (spellDamageInfo->resist < 0 ? uint32(std::abs(spellDamageInfo->resist)) : 0);
     spellDamageInfo->damage += bonus;
     const uint32 malus = (spellDamageInfo->resist > 0 ? (spellDamageInfo->absorb + uint32(spellDamageInfo->resist)) : spellDamageInfo->absorb);
     spellDamageInfo->damage = (spellDamageInfo->damage <= malus ? 0 : (spellDamageInfo->damage - malus));
+
+    if (spellProto && spellProto->Id == 33846)
+        sLog.outError("VORPIL-DEBUG [CalculateAbsorbResistBlock] target=%s preMitigationDamage=%u resist=%d absorb=%u bonus(from negative resist)=%u malus=%u finalDamage=%u",
+            GetName(), preMitigationDamage, spellDamageInfo->resist, spellDamageInfo->absorb, bonus, malus, spellDamageInfo->damage);
 }
 
 void Unit::AttackerStateUpdate(Unit* pVictim, WeaponAttackType attType, bool extra)

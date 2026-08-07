@@ -226,8 +226,13 @@ struct npc_void_travelerAI : public CombatAI
     {
         if (!m_hasExploded && who->GetEntry() == NPC_VORPIL && who->IsWithinDistInMap(m_creature, 3.0f))
         {
+            sLog.outError("VORPIL-DEBUG [MoveInLineOfSight] Void Traveler guid=%u level=%u about to cast SPELL_SHADOW_NOVA (33846), isRegularMode=%d",
+                m_creature->GetGUIDLow(), m_creature->GetLevel(), m_isRegularMode);
+
             if (DoCastSpellIfCan(nullptr, SPELL_SHADOW_NOVA) == CAST_OK)
             {
+                sLog.outError("VORPIL-DEBUG [MoveInLineOfSight] SPELL_SHADOW_NOVA cast returned CAST_OK, now casting Empowering Shadows (%s)",
+                    m_isRegularMode ? "normal 33783" : "heroic 39364");
                 DoCastSpellIfCan(nullptr, m_isRegularMode ? SPELL_EMPOWERING_SHADOWS : SPELL_EMPOWERING_SHADOWS_H, CAST_TRIGGERED);
                 m_hasExploded = true;
                 ResetTimer(1, 1);
