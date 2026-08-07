@@ -3179,14 +3179,14 @@ int32 WorldObject::CalculateSpellEffectValue(Unit const* target, SpellEntry cons
                 float CLSPowerSpell = spellCLS->BaseDamage;
                 value = value * (CLSPowerCreature / CLSPowerSpell);
 
-                if (spellProto->Id == 33846)
+                if (spellProto->Id == 33501)
                     sLog.outError("VORPIL-DEBUG [CalculateSpellEffectValue] SCALES_WITH_CREATURE_LEVEL branch hit: casterLevel=%u CLSPowerCreature=%f CLSPowerSpell=%f value=%f",
                         unitCaster->GetLevel(), CLSPowerCreature, CLSPowerSpell, value);
             }
         }
     }
 
-    if (spellProto->Id == 33846)
+    if (spellProto->Id == 33501)
         sLog.outError("VORPIL-DEBUG [CalculateSpellEffectValue] caster=%s effIdx=%u baseDice=%d basePointsPerLevel=%f randomPointsPerLevel=%f rawBasePoints=%f randomPoints=%d finalValue=%f",
             unitCaster ? unitCaster->GetName() : "?", effect_index, baseDice, basePointsPerLevel, randomPointsPerLevel, basePoints, randomPoints, value);
 

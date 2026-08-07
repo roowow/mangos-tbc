@@ -542,7 +542,7 @@ void Spell::EffectSchoolDMG(SpellEffectIndex eff_idx)
             }
         }
 
-        if (m_spellInfo->Id == 33846)
+        if (m_spellInfo->Id == 33501)
             sLog.outError("VORPIL-DEBUG [EffectSchoolDMG] caster=%s target=%s eff_idx=%u damage(after family-specific switch, before CalculateSpellEffectDamage)=%d",
                 m_caster ? m_caster->GetName() : "?", unitTarget->GetName(), eff_idx, damage);
 

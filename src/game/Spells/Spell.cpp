@@ -6727,7 +6727,7 @@ int32 Spell::CalculateSpellEffectDamage(Unit* unitTarget, int32 damage, float da
         break;
     }
 
-    if (m_spellInfo->Id == 33846)
+    if (m_spellInfo->Id == 33501)
         sLog.outError("VORPIL-DEBUG [CalculateSpellEffectDamage] caster=%s target=%s DmgClass=%u rawDamageIn=%d damageDoneMod=%f finalDamageOut=%d",
             m_trueCaster ? m_trueCaster->GetName() : "?", unitTarget ? unitTarget->GetName() : "?", m_spellInfo->DmgClass, rawDamage, damageDoneMod, damage);
 

@@ -2756,7 +2756,7 @@ void Unit::CalculateAbsorbResistBlock(Unit* caster, SpellNonMeleeDamage* spellDa
     const uint32 malus = (spellDamageInfo->resist > 0 ? (spellDamageInfo->absorb + uint32(spellDamageInfo->resist)) : spellDamageInfo->absorb);
     spellDamageInfo->damage = (spellDamageInfo->damage <= malus ? 0 : (spellDamageInfo->damage - malus));
 
-    if (spellProto && spellProto->Id == 33846)
+    if (spellProto && spellProto->Id == 33501)
         sLog.outError("VORPIL-DEBUG [CalculateAbsorbResistBlock] target=%s preMitigationDamage=%u resist=%d absorb=%u bonus(from negative resist)=%u malus=%u finalDamage=%u",
             GetName(), preMitigationDamage, spellDamageInfo->resist, spellDamageInfo->absorb, bonus, malus, spellDamageInfo->damage);
 }
