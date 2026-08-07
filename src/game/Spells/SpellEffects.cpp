@@ -319,6 +319,15 @@ void Spell::EffectSchoolDMG(SpellEffectIndex eff_idx)
                         damage = (20 - m_caster->GetDistance(x, y, z, DIST_CALC_COMBAT_REACH))*(damage / 20);
                         break;
                     }
+                    case 33501:                             // Shadow Nova - Malicious Instructor
+                    {
+                        // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL with spellLevel 20;
+                        // at level 70 this inflates the roll to ~3200-3700, overriding with the
+                        // intended difficulty-appropriate range instead
+                        bool isRegular = m_caster->GetMap()->IsRegularDifficulty();
+                        damage = isRegular ? urand(1000, 1500) : urand(2000, 2500);
+                        break;
+                    }
                     // Lightning Strike
                     case 37841:
                         if (unitTarget->GetTypeId() == TYPEID_PLAYER && unitTarget->HasAura(37830)) // Repolarized Magneto Sphere
@@ -541,10 +550,6 @@ void Spell::EffectSchoolDMG(SpellEffectIndex eff_idx)
                 break;
             }
         }
-
-        if (m_spellInfo->Id == 33501)
-            sLog.outError("VORPIL-DEBUG [EffectSchoolDMG] caster=%s target=%s eff_idx=%u damage(after family-specific switch, before CalculateSpellEffectDamage)=%d",
-                m_caster ? m_caster->GetName() : "?", unitTarget->GetName(), eff_idx, damage);
 
         if (damage >= 0)
             m_damagePerEffect[eff_idx] = CalculateSpellEffectDamage(unitTarget, damage, m_damageDoneMultiplier[eff_idx], eff_idx);
