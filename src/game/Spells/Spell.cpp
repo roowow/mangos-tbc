@@ -2352,6 +2352,10 @@ void Spell::SetTargetMap(SpellEffectIndex effIndex, uint32 targetMode, bool targ
             if (fishingSkill < minimumRequiredSkill)
                 result = SPELL_FAILED_LOW_CASTLEVEL;
 
+            if (m_caster->IsPlayer())
+                sLog.outError("FISH-DEBUG [EffectTargetLocationFishing] caster=%s mapId=%u zone=%u area=%u fishingSkill=%u minimumRequiredSkill=%u result=%u",
+                    m_caster->GetName(), mapId, zone, area, fishingSkill, minimumRequiredSkill, result);
+
             if (result != SPELL_CAST_OK)
             {
                 SendCastResult(result);
