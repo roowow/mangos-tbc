@@ -444,8 +444,6 @@ void SpellTargetMgr::Initialize()
                                             ignore = true;
                                             break;
                                         }
-                                        if (effectTargetingSource.requiredTarget == TARGET_TYPE_NONE)
-                                            continue;
                                         // aoe and chain case
                                         if (info.enumerator == TARGET_ENUMERATOR_CHAIN) // chain checks chaining
                                             // if chain targets are not the same, cant ignore
@@ -543,12 +541,7 @@ bool SpellTargetMgr::CanEffectConsumeTarget(SpellTargetImplicitType targetType, 
     switch (targetType)
     {
         // incomplete mapping - adjust as needed
-        case TARGET_TYPE_UNIT:
-            if (effectTargetType == TARGET_TYPE_LOCATION_DEST)
-                return false; // 43178
-            if (effectTargetType == TARGET_TYPE_NONE)
-                return false; // 51957
-            break;
+        case TARGET_TYPE_UNIT: if (effectTargetType == TARGET_TYPE_LOCATION_DEST) return false; // 43178
         default: break;
     }
     return true;
