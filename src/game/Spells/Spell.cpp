@@ -2208,6 +2208,7 @@ void Spell::SetTargetMap(SpellEffectIndex effIndex, uint32 targetMode, bool targ
                             break;
                         case 33: // stranglethorn
                         case 45: // arathi
+                        case 8: // swamp of sorrows
                             minimumRequiredSkill = 130;
                             break;
                         case 28: // western plaguelands
@@ -2351,10 +2352,6 @@ void Spell::SetTargetMap(SpellEffectIndex effIndex, uint32 targetMode, bool targ
             uint32 fishingSkill = m_caster->IsPlayer() ? static_cast<Player*>(m_caster)->GetSkillValue(SKILL_FISHING) : 0;
             if (fishingSkill < minimumRequiredSkill)
                 result = SPELL_FAILED_LOW_CASTLEVEL;
-
-            if (m_caster->IsPlayer())
-                sLog.outError("FISH-DEBUG [EffectTargetLocationFishing] caster=%s mapId=%u zone=%u area=%u fishingSkill=%u minimumRequiredSkill=%u result=%u",
-                    m_caster->GetName(), mapId, zone, area, fishingSkill, minimumRequiredSkill, result);
 
             if (result != SPELL_CAST_OK)
             {
