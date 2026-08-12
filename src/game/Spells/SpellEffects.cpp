@@ -347,6 +347,16 @@ void Spell::EffectSchoolDMG(SpellEffectIndex eff_idx)
                         damage = m_spellInfo->Id == 12675 ? urand(1290, 1760) : urand(2580, 3520);
                         break;
                     }
+                    case 37272:                             // Poison Bolt - Bog Overlord (normal)
+                    case 37862:                             // Poison Bolt - Bog Overlord (heroic)
+                    {
+                        // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL with spellLevel 20;
+                        // at level 70 this inflates the initial hit far beyond intended, overriding with the
+                        // intended range instead (heroic keeps the ~2x ratio already present in the raw data);
+                        // the periodic nature DoT (effect 2) is unaffected by the scaling bug and is left alone
+                        damage = m_spellInfo->Id == 37272 ? urand(1000, 1675) : urand(2000, 3350);
+                        break;
+                    }
                     // Lightning Strike
                     case 37841:
                         if (unitTarget->GetTypeId() == TYPEID_PLAYER && unitTarget->HasAura(37830)) // Repolarized Magneto Sphere
