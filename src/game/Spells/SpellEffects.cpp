@@ -375,6 +375,16 @@ void Spell::EffectSchoolDMG(SpellEffectIndex eff_idx)
                             damage = urand(1500, 2200);
                         break;
                     }
+                    case 32011:                             // Water Bolt - shared template used by several naga/murloc-type casters
+                    {
+                        // only override for Coilskar Siren (Shadowmoon Valley open-world trash, non-elite);
+                        // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL with spellLevel 20, which at level 68-69
+                        // inflates the roll far beyond what a regular (non-elite) trash mob should deal - other
+                        // casters of this shared spell ID (elites/instance mobs) are left alone
+                        if (m_caster->GetEntry() == 19768)
+                            damage = urand(400, 700);
+                        break;
+                    }
                     // Lightning Strike
                     case 37841:
                         if (unitTarget->GetTypeId() == TYPEID_PLAYER && unitTarget->HasAura(37830)) // Repolarized Magneto Sphere

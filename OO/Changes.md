@@ -67,9 +67,19 @@ Grandmaster Vorpil 自己的暗影新星（33846）有同样"不分难度"问题
 修复：`SpellEffects.cpp` `EffectSchoolDMG` 新增 `case 16102:`，内部判断 `m_caster->GetEntry() == 19797` 才覆盖伤害，其他共用同一法术ID的怪物不受影响，不改动法术ID/数据库。
 **状态**：✅ 代码已实施，等待编译部署 + 实测反馈（这条的数值置信度最低，重点关注玩家反馈）。
 
+### 影月谷"库斯卡海妖"水箭伤害过高（2026-08-12）
+玩家反馈影月谷（Shadowmoon Valley，map 530，库斯卡角/Coilskar Point一带，18个固定野外刷新点）库斯卡海妖（entry 19768，68-69级，**`Rank=0`普通小怪、非精英**，`UnitClass=2`，靠 `creature_ai_scripts` 施放）"水箭"（法术32011）伤害过高。同一根因（`Attributes=524288` 含 `SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL`，`spellLevel=20`；68/69级缩放系数分别约16.4/18.8倍，比之前几个70+级怪略低但仍然远超合理范围）。
+**排查过程中的一处订正**：一开始误以为玩家说的"暗影迷宫"指向副本内容，核实发现 entry 19768 全部18个刷新点都在 map 530 开放世界，跟暗影迷宫（map 555）对不上；玩家确认是记错了，实际位置是影月谷野外，核实通过。
+**跟"烈焰风暴"同一类复杂情况——法术ID被共用**：`creature_ai_scripts` 查到 Coilskar Sorceress(19767)、Keeper of the Cistern(20795)、Lakaan(21416)、Skettis Surger(21728)、Bloodscale Wavecaller(20089) 都在用同一个 spell 32011，同样只能精确判断施法者是这个怪（`m_caster->GetEntry() == 19768`），不能笼统按法术ID覆盖。
+数值：同样完全没有外部参考数据（`Schaka/TBC-research` 只覆盖副本/团本，不涉及野外怪）。**用户结合"这是普通小怪、不是精英，正常刷图不该被打这么疼"给出保守估计 `urand(400,700)`**，明显低于本轮其他几个精英怪的修复数值，符合"普通怪强度应该更低"的直觉，纯人工判断，上线后需要玩家实测反馈校准。
+修复：`SpellEffects.cpp` `EffectSchoolDMG` 新增 `case 32011:`，内部判断 `m_caster->GetEntry() == 19768` 才覆盖伤害，其他共用同一法术ID的怪物不受影响，不改动法术ID/数据库。
+**状态**：✅ 代码已实施，等待编译部署 + 实测反馈。
+
 ### ⚠️ 系统性发现：`SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL` 缩放溢出是批量问题，不止个案（2026-08-12）
 排查冰霜震击时用 SQL 批量筛查"带 `SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL` 属性 + `spellLevel` 远低于实际施法怪物等级（差值≥30级）"这个特征，一次性查出 **204个不同法术、涉及247个不同怪物**存在同一种缩放溢出隐患，覆盖奥金顿、蒸汽地窖、赛斯克大厅、卡拉波神殿、影月谷野外怪、旧希尔斯布莱德等大量副本和野外区域（已确认的"暗影新星""冰霜震击"都在这份清单里，验证了排查逻辑正确）。
 **结论**：不适合继续用"发现一个、手动查资料、加一个`case`"这种一对一方式处理，204个技能逐个查证不现实。
+
+**排查范围有缺口，实际受影响数量可能更多**：本轮后续修复"烈焰风暴"（16102）、"水箭"（32011）时发现，这两个都是通过老式 `creature_ai_scripts` 系统施法（`creature_template.SpellList=0`），而当初排查204个用的 SQL 只 JOIN 了 `creature_spell_list`（新版系统），完全没覆盖走 `creature_ai_scripts` 的这批怪——204这个数字只是"新系统"部分，"老系统"部分还没排查过，实际总数会更多。以后系统性修复时需要把这条路径也覆盖进筛查 SQL。
 
 **根因定位到公式本身**：`Object.cpp` 的 `CalculateSpellEffectValue`，`value = value * (CLSPowerCreature / CLSPowerSpell)`，`CLSPower*` 来自 `creature_template_classlevelstats.BaseDamage`——这张表按等级增长是陡峭曲线而非线性（同职业20级→70级差21.6倍），公式本身没有任何"等级差过大就封顶/失效"的保护，导致被套用到"20级模板 vs 70级施法者"这种远超设计初衷的极端场景时直接崩坏。**已核实这段代码（含 `// TODO: Drastically beter than before, but still needs some additional aura scaling research` 这条注释）在 upstream mangos-tbc 里逐字节一致存在**——不是 Nmangos-tbc 自己的问题，是继承自官方仓库的共享缺陷，官方自己也承认这块"还需要进一步研究"，不是我们独有的坑。
 
