@@ -357,6 +357,15 @@ void Spell::EffectSchoolDMG(SpellEffectIndex eff_idx)
                         damage = m_spellInfo->Id == 37272 ? urand(1000, 1675) : urand(2000, 3350);
                         break;
                     }
+                    case 15234:                             // Lightning Bolt - Coilfang Siren (normal)
+                    case 37664:                             // Lightning Bolt - Coilfang Siren (heroic)
+                    {
+                        // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL with spellLevel 20;
+                        // at level 70 this inflates the roll far beyond intended, overriding with the
+                        // intended range instead (heroic keeps the ~2x ratio already present in the raw data)
+                        damage = m_spellInfo->Id == 15234 ? urand(1200, 1750) : urand(2400, 3500);
+                        break;
+                    }
                     // Lightning Strike
                     case 37841:
                         if (unitTarget->GetTypeId() == TYPEID_PLAYER && unitTarget->HasAura(37830)) // Repolarized Magneto Sphere

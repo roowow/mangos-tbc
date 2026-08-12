@@ -51,6 +51,12 @@ Grandmaster Vorpil 自己的暗影新星（33846）有同样"不分难度"问题
 修复：`SpellEffects.cpp` `EffectSchoolDMG` 新增 `case 37272: case 37862:`，按法术ID直接区分伤害，DoT部分未改动，不改动法术ID/数据库。
 **状态**：✅ 代码已实施，等待编译部署 + 实测反馈。
 
+### 蒸汽地窖"盘牙海妖"闪电箭伤害过高（2026-08-12）
+玩家反馈同一副本精英怪盘牙海妖（entry 17801，`UnitClass=2`，70级，`Expansion=1`）"闪电箭"（法术15234普通/37664英雄）伤害过高，同一根因，`Attributes=589824` 含 `SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL`，`spellLevel=20`。原始 `EffectBasePoints1`/`EffectDieSides1` 数据（142/51 普通、285/101 英雄）跟"寒冰箭"完全相同，应是同一套技能模板复用、只换了法术学派。
+数值参考：`Schaka/TBC-research` issue #9 查到"Lightning Bolt for 2400-3500"（英雄，Corecraft观测Educated Guess，可信度中等）；普通按数据库2倍比例反推 ≈ `urand(1200,1750)`。
+修复：`SpellEffects.cpp` `EffectSchoolDMG` 新增 `case 15234: case 37664:`，按法术ID直接区分伤害，不改动法术ID/数据库。
+**状态**：✅ 代码已实施，等待编译部署 + 实测反馈。
+
 ### ⚠️ 系统性发现：`SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL` 缩放溢出是批量问题，不止个案（2026-08-12）
 排查冰霜震击时用 SQL 批量筛查"带 `SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL` 属性 + `spellLevel` 远低于实际施法怪物等级（差值≥30级）"这个特征，一次性查出 **204个不同法术、涉及247个不同怪物**存在同一种缩放溢出隐患，覆盖奥金顿、蒸汽地窖、赛斯克大厅、卡拉波神殿、影月谷野外怪、旧希尔斯布莱德等大量副本和野外区域（已确认的"暗影新星""冰霜震击"都在这份清单里，验证了排查逻辑正确）。
 **结论**：不适合继续用"发现一个、手动查资料、加一个`case`"这种一对一方式处理，204个技能逐个查证不现实。
