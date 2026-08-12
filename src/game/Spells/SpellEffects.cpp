@@ -366,6 +366,15 @@ void Spell::EffectSchoolDMG(SpellEffectIndex eff_idx)
                         damage = m_spellInfo->Id == 15234 ? urand(1200, 1750) : urand(2400, 3500);
                         break;
                     }
+                    case 16102:                             // Flamestrike - shared template used by many creatures of different levels (57-71+)
+                    {
+                        // only override for Illidari Highlord (Battle of the Crimson Watch, Shadowmoon Valley);
+                        // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL with spellLevel 20, which at level 71
+                        // inflates the roll far beyond intended - other casters of this shared spell ID are left alone
+                        if (m_caster->GetEntry() == 19797)
+                            damage = urand(1500, 2200);
+                        break;
+                    }
                     // Lightning Strike
                     case 37841:
                         if (unitTarget->GetTypeId() == TYPEID_PLAYER && unitTarget->HasAura(37830)) // Repolarized Magneto Sphere
