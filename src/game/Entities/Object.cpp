@@ -3178,9 +3178,16 @@ int32 WorldObject::CalculateSpellEffectValue(Unit const* target, SpellEntry cons
                 float CLSPowerCreature = casterCLS->BaseDamage;
                 float CLSPowerSpell = spellCLS->BaseDamage;
                 value = value * (CLSPowerCreature / CLSPowerSpell);
+
+                if (spellProto->Id == 22582 || spellProto->Id == 37865)
+                    sLog.outError("FROSTSHOCK-DEBUG [CalculateSpellEffectValue] SCALES_WITH_CREATURE_LEVEL branch hit: effIdx=%u casterLevel=%u CLSPowerCreature=%f CLSPowerSpell=%f value=%f",
+                        effect_index, unitCaster->GetLevel(), CLSPowerCreature, CLSPowerSpell, value);
             }
         }
     }
+
+    if (spellProto->Id == 22582 || spellProto->Id == 37865)
+        sLog.outError("FROSTSHOCK-DEBUG [CalculateSpellEffectValue] effIdx=%u finalValue=%f", effect_index, value);
 
     return value;
 }
