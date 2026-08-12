@@ -338,6 +338,15 @@ void Spell::EffectSchoolDMG(SpellEffectIndex eff_idx)
                         damage = isRegular ? urand(1700, 2100) : urand(2900, 3500);
                         break;
                     }
+                    case 12675:                             // Frostbolt - Coilfang Sorceress (normal)
+                    case 37930:                             // Frostbolt - Coilfang Sorceress (heroic)
+                    {
+                        // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL with spellLevel 20;
+                        // at level 70 this inflates the roll far beyond intended, overriding with the
+                        // intended range instead (heroic keeps the ~2x ratio already present in the raw data)
+                        damage = m_spellInfo->Id == 12675 ? urand(1290, 1760) : urand(2580, 3520);
+                        break;
+                    }
                     // Lightning Strike
                     case 37841:
                         if (unitTarget->GetTypeId() == TYPEID_PLAYER && unitTarget->HasAura(37830)) // Repolarized Magneto Sphere
