@@ -3180,6 +3180,16 @@ int32 WorldObject::CalculateSpellEffectValue(Unit const* target, SpellEntry cons
                 value = value * (CLSPowerCreature / CLSPowerSpell);
             }
         }
+
+        // periodic-damage effects don't route through Spell::EffectSchoolDMG, so the
+        // SCALES_WITH_CREATURE_LEVEL overrides for them have to live here instead
+        if (effect_index == EFFECT_INDEX_1 && (spellProto->Id == 37272 || spellProto->Id == 37862)) // Poison Bolt DoT - Bog Overlord
+            value = spellProto->Id == 37272 ? float(irand(260, 436)) : float(irand(520, 871));
+
+        // Rain of Fire - shared template used by several Shadowmoon Valley elites; only override
+        // for Makazradon (Legion Hold quest encounter), other casters of this shared spell ID are left alone
+        if (effect_index == EFFECT_INDEX_0 && spellProto->Id == 38741 && unitCaster->GetEntry() == 21501)
+            value = float(irand(300, 600));
     }
 
     return value;

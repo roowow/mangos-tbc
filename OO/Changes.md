@@ -45,10 +45,13 @@ Grandmaster Vorpil 自己的暗影新星（33846）有同样"不分难度"问题
 
 ### 蒸汽地窖"泥沼主宰"毒液箭伤害过高（2026-08-12）
 玩家反馈同一副本精英怪泥沼主宰（entry 21694，`UnitClass=1`，与前两个精英怪UnitClass=2不同，但查表确认20级/70级的 `BaseDamage` 缩放比例同样是21.593倍，两个职业曲线数值相同）"毒液箭"（法术37272普通/37862英雄）单次命中7590自然伤害，同一根因（`Attributes=524288` 含 `SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL`，`spellLevel=20`）。
-技能结构：Effect1直接伤害（受缩放bug影响）+ Effect2自然DoT（5秒/跳，普通29点/英雄59点，**不受缩放bug影响**，因为光环类效果不在触发缩放的效果类型列表里，无需处理）。
+技能结构：Effect1直接伤害（受缩放bug影响）+ Effect2自然DoT（5秒/跳，普通29点/英雄59点）。
 普通(37272)/英雄(37862)原始基数同样是干净的2倍关系（112/75 vs 224/151）。
 数值参考：`Schaka/TBC-research` issue #9 查到"Poison Bolt for 2000-3350 and DoT ticking 587 per stack"（Corecraft观测Educated Guess，可信度中等，量级与截图7590吻合）；普通难度按数据库2倍比例反推 ≈ `urand(1000,1675)`。
-修复：`SpellEffects.cpp` `EffectSchoolDMG` 新增 `case 37272: case 37862:`，按法术ID直接区分伤害，DoT部分未改动，不改动法术ID/数据库。
+修复：`SpellEffects.cpp` `EffectSchoolDMG` 新增 `case 37272: case 37862:`，按法术ID直接区分伤害，不改动法术ID/数据库。
+
+**⚠️ 后续订正（2026-08-12，排查"火焰之雨"时发现）**：最初判断"Effect2自然DoT不受缩放bug影响、无需处理"是**错的**。深挖 `Object.cpp` 缩放公式发现，判断逻辑是**优先看 `EffectApplyAuraName`**——如果这个效果挂的光环类型是 `SPELL_AURA_PERIODIC_DAMAGE`（持续伤害），照样会被同一套缩放放大，跟"是不是光环"无关。毒液箭的DoT（`EffectApplyAuraName2=3`=`PERIODIC_DAMAGE`）正好命中这个分支，之前完全没处理。已核实其他几个已修复的技能（寒冰箭/闪电箭的第二效果是"减速"`MOD_DECREASE_SPEED`，不在缩放判定列表里，确实不受影响，判断没错，只有毒液箭这个是漏的）。
+补充修复：由于这个DoT效果不走 `EffectSchoolDMG`（该函数只处理直接伤害类效果），改在 `Object.cpp` 的 `CalculateSpellEffectValue`（缩放公式本身发生的地方）针对 `spellProto->Id`+`effect_index==EFFECT_INDEX_1` 直接覆盖。数值按DoT基数占初始命中基数的比例（约26%，29/112≈0.259，59/224≈0.263）套用到已定的初始命中目标值反推：普通每跳 `irand(260,436)`，英雄每跳 `irand(520,871)`（英雄区间恰好包含 Schaka 参考的587，互相印证）。跳2次（5秒间隔，共10秒）。
 **状态**：✅ 代码已实施，等待编译部署 + 实测反馈。
 
 ### 蒸汽地窖"盘牙海妖"闪电箭伤害过高（2026-08-12）
@@ -75,11 +78,28 @@ Grandmaster Vorpil 自己的暗影新星（33846）有同样"不分难度"问题
 修复：`SpellEffects.cpp` `EffectSchoolDMG` 新增 `case 32011:`，内部判断 `m_caster->GetEntry() == 19768` 才覆盖伤害，其他共用同一法术ID的怪物不受影响，不改动法术ID/数据库。
 **状态**：✅ 代码已实施，等待编译部署 + 实测反馈。
 
+### 特罗凯森林"斯克提斯唤魂者"暗影箭伤害过高（2026-08-12）
+玩家反馈特罗凯森林斯克提斯（Skettis，map 530，阿拉卡尔鸦人日常任务区）唤魂者（entry 21911，70-71级，**`Rank=0`普通小怪、非精英**，`UnitClass=2`，走 `creature_ai_scripts`）"暗影箭"（法术20298）伤害过高，同一根因（`Attributes` 含 `SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL`，`spellLevel=20`，70-71级缩放系数约21.6-22倍）。
+同样是法术ID被共用：`creature_ai_scripts` 查到 Dreadmaul Warlock、Outcast Necromancer、Gordunni Warlock 等好几个等级差很大的旧世界怪都在用同一个 spell 20298，只判断施法者是这个怪（`m_caster->GetEntry() == 21911`）才覆盖。
+数值：同样没有外部参考数据。参照"库斯卡海妖"（同为非精英野怪，68-69级给了400-700）的档位，按等级略高给 `urand(500,800)`，纯人工判断。
+修复：`SpellEffects.cpp` `EffectSchoolDMG` 新增 `case 20298:`，内部判断施法者entry，其他共用同一法术ID的怪物不受影响，不改动法术ID/数据库。
+**状态**：✅ 代码已实施，等待编译部署 + 实测反馈。
+
+### 影月谷"军团要塞"玛卡扎顿火焰之雨伤害过高（2026-08-12）
+玩家反馈影月谷军团要塞（Legion Hold）任务精英玛卡扎顿（entry 21501，68-69级，`Rank=1`精英，`UnitClass=1`，两个深渊魔王之一，走 `creature_ai_scripts`）"火焰之雨"（法术38741）伤害异常。同一根因（`Attributes` 含 `SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL`，`spellLevel=20`）。
+**这次跟之前几个的关键区别——技能本身就是持续伤害光环，不走 `EffectSchoolDMG`**：`Effect1=27`(PERSIST_AREA_AURA) + `EffectApplyAuraName1=3`(PERIODIC_DAMAGE，每3秒跳一次)，是纯粹的地面持续伤害区域，不是"直接命中"类效果，所以完全不会经过前8次用来修复的 `Spell::EffectSchoolDMG` 函数。**修复位置改在缩放公式本身发生的地方**（`Object.cpp` 的 `CalculateSpellEffectValue`，针对 `spellProto->Id`+`effect_index` 直接覆盖），这也是排查这条时才发现"毒液箭DoT遭漏修"这个问题的契机（见上面订正）。
+同样是法术ID被共用：`creature_ai_scripts` 查到 Morgroron(21500,68-69级)、Azaloth(21506,70级)、Throne-Guard Champion(22302,72级) 也在用同一个 spell 38741，只判断施法者是这个怪（`unitCaster->GetEntry() == 21501`）才覆盖。
+数值：Wowhead 技能描述显示"每3秒50点火焰伤害"，但这应该是客户端按现代参照等级重算的展示值（不是数据库原始 `EffectBasePoints1=167`），不能直接当目标值用。这个技能是"可走位躲开的地面AoE"设计（不是无法躲避的爆发伤害），如果每跳定得跟单次爆发技能一样高，多跳不躲会变得过于致命，不符合机制设计意图。用户按此判断给出保守估计 `irand(300,600)`/跳，纯人工判断。
+修复：`Object.cpp` `CalculateSpellEffectValue` 补充判断 `effect_index==EFFECT_INDEX_0 && spellProto->Id==38741 && unitCaster->GetEntry()==21501` 才覆盖，其他共用同一法术ID的怪物不受影响，不改动法术ID/数据库。
+**状态**：✅ 代码已实施，等待编译部署 + 实测反馈。
+
 ### ⚠️ 系统性发现：`SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL` 缩放溢出是批量问题，不止个案（2026-08-12）
 排查冰霜震击时用 SQL 批量筛查"带 `SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL` 属性 + `spellLevel` 远低于实际施法怪物等级（差值≥30级）"这个特征，一次性查出 **204个不同法术、涉及247个不同怪物**存在同一种缩放溢出隐患，覆盖奥金顿、蒸汽地窖、赛斯克大厅、卡拉波神殿、影月谷野外怪、旧希尔斯布莱德等大量副本和野外区域（已确认的"暗影新星""冰霜震击"都在这份清单里，验证了排查逻辑正确）。
 **结论**：不适合继续用"发现一个、手动查资料、加一个`case`"这种一对一方式处理，204个技能逐个查证不现实。
 
 **排查范围有缺口，实际受影响数量可能更多**：本轮后续修复"烈焰风暴"（16102）、"水箭"（32011）时发现，这两个都是通过老式 `creature_ai_scripts` 系统施法（`creature_template.SpellList=0`），而当初排查204个用的 SQL 只 JOIN 了 `creature_spell_list`（新版系统），完全没覆盖走 `creature_ai_scripts` 的这批怪——204这个数字只是"新系统"部分，"老系统"部分还没排查过，实际总数会更多。以后系统性修复时需要把这条路径也覆盖进筛查 SQL。
+
+**另一处缺口——判定逻辑不是只看"效果类型"，还要看"光环类型"，且不是所有受影响效果都走同一个下游函数**：排查"毒液箭"时发现，缩放判定优先看 `EffectApplyAuraName`（光环类型是 `PERIODIC_DAMAGE`/`PERIODIC_LEECH`/`SCHOOL_ABSORB`/`POWER_BURN_MANA`/`PERIODIC_TRIGGER_SPELL_WITH_VALUE`/`PERIODIC_MANA_LEECH` 这几种照样会被缩放），只有查不到光环类型时才退回看"效果类型"（`SCHOOL_DAMAGE`等）。之前几次修复只处理了"直接命中"这一种（走 `Spell::EffectSchoolDMG`），漏了"持续伤害光环"这一种（`Effect=27`纯光环技能如"火焰之雨"完全不经过 `EffectSchoolDMG`，必须在 `CalculateSpellEffectValue` 本身覆盖）——204个清单里可能还有别的技能是这种"纯光环"或"直接命中+被忽略的DoT"结构，逐个核对时要把 `EffectApplyAuraName1/2/3` 也纳入检查，不能只看 `Effect1/2/3` 的表面类型。
 
 **根因定位到公式本身**：`Object.cpp` 的 `CalculateSpellEffectValue`，`value = value * (CLSPowerCreature / CLSPowerSpell)`，`CLSPower*` 来自 `creature_template_classlevelstats.BaseDamage`——这张表按等级增长是陡峭曲线而非线性（同职业20级→70级差21.6倍），公式本身没有任何"等级差过大就封顶/失效"的保护，导致被套用到"20级模板 vs 70级施法者"这种远超设计初衷的极端场景时直接崩坏。**已核实这段代码（含 `// TODO: Drastically beter than before, but still needs some additional aura scaling research` 这条注释）在 upstream mangos-tbc 里逐字节一致存在**——不是 Nmangos-tbc 自己的问题，是继承自官方仓库的共享缺陷，官方自己也承认这块"还需要进一步研究"，不是我们独有的坑。
 

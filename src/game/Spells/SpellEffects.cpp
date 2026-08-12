@@ -353,7 +353,8 @@ void Spell::EffectSchoolDMG(SpellEffectIndex eff_idx)
                         // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL with spellLevel 20;
                         // at level 70 this inflates the initial hit far beyond intended, overriding with the
                         // intended range instead (heroic keeps the ~2x ratio already present in the raw data);
-                        // the periodic nature DoT (effect 2) is unaffected by the scaling bug and is left alone
+                        // the periodic nature DoT (effect 2) is ALSO scaled by the same bug - see the matching
+                        // override in WorldObject::CalculateSpellEffectValue (Object.cpp)
                         damage = m_spellInfo->Id == 37272 ? urand(1000, 1675) : urand(2000, 3350);
                         break;
                     }
@@ -383,6 +384,16 @@ void Spell::EffectSchoolDMG(SpellEffectIndex eff_idx)
                         // casters of this shared spell ID (elites/instance mobs) are left alone
                         if (m_caster->GetEntry() == 19768)
                             damage = urand(400, 700);
+                        break;
+                    }
+                    case 20298:                             // Shadow Bolt - shared template used by several unrelated low-level casters
+                    {
+                        // only override for Skettis Soulcaller (Terokkar Forest / Skettis open-world trash, non-elite);
+                        // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL with spellLevel 20, which at level 70-71
+                        // inflates the roll far beyond what a regular (non-elite) trash mob should deal - other
+                        // casters of this shared spell ID (much lower level old-world mobs) are left alone
+                        if (m_caster->GetEntry() == 21911)
+                            damage = urand(500, 800);
                         break;
                     }
                     // Lightning Strike
