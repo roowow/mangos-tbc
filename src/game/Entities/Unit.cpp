@@ -2741,8 +2741,6 @@ void Unit::CalculateDamageAbsorbAndResist(Unit* caster, SpellSchoolMask schoolMa
 
 void Unit::CalculateAbsorbResistBlock(Unit* caster, SpellNonMeleeDamage* spellDamageInfo, SpellEntry const* spellProto, WeaponAttackType attType)
 {
-    uint32 preBlockDamage = spellDamageInfo->damage;
-
     if (RollAbilityPartialBlockOutcome(caster, attType, spellProto))
     {
         spellDamageInfo->blocked = std::min(GetShieldBlockValue(), spellDamageInfo->damage);
@@ -2755,10 +2753,6 @@ void Unit::CalculateAbsorbResistBlock(Unit* caster, SpellNonMeleeDamage* spellDa
     spellDamageInfo->damage += bonus;
     const uint32 malus = (spellDamageInfo->resist > 0 ? (spellDamageInfo->absorb + uint32(spellDamageInfo->resist)) : spellDamageInfo->absorb);
     spellDamageInfo->damage = (spellDamageInfo->damage <= malus ? 0 : (spellDamageInfo->damage - malus));
-
-    if (spellProto && (spellProto->Id == 22582 || spellProto->Id == 37865))
-        sLog.outError("FROSTSHOCK-DEBUG [CalculateAbsorbResistBlock] target=%s preBlockDamage=%u blocked=%u resist=%d absorb=%u bonus(from negative resist)=%u malus=%u finalDamage=%u",
-            GetName(), preBlockDamage, spellDamageInfo->blocked, spellDamageInfo->resist, spellDamageInfo->absorb, bonus, malus, spellDamageInfo->damage);
 }
 
 void Unit::AttackerStateUpdate(Unit* pVictim, WeaponAttackType attType, bool extra)

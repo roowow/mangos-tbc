@@ -30,6 +30,36 @@ Grandmaster Vorpil 自己的暗影新星（33846）有同样"不分难度"问题
 修复：`case 33/45`（藏宝海湾/艾拉希高地）同档加入 `case 8`，值 130。
 **状态**：✅ 代码已实施，等待编译部署 + 实测。
 
+### 蒸汽地窖"盘牙先知"冰霜震击伤害过高（2026-08-12）
+玩家反馈蒸汽地窖（The Steamvault，map 545）精英怪盘牙先知（entry 17803）"冰霜震击"（法术22582普通/37865英雄）单次命中7772点冰霜伤害。根因与"暗影新星"完全同一种模式：法术携带 `SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL`（`spellLevel=20`），70级施法者按生物基础伤害比例放大约21.6倍（`CLSPowerCreature=261.316/CLSPowerSpell=12.103`，与恶毒导师那次系数逐位一致，因为都是UnitClass=2）；且普通/英雄两个法术ID数据完全相同，无难度区分。经4处调试日志实锤，全程无额外因素（resist/absorb/block均为0，链路上数值未被二次改动）。
+数值参考：英雄难度找到 `Schaka/TBC-research` issue #9 的 Corecraft 观测值"Frost Shock for 3214"（作者标注为"Educated Guess"，未与WDB客户端数据核对，可信度中等）；普通难度完全没有查到可靠数字（另一个疑似线索 issue #21 的"1092-1543"经核实是近战物理伤害区间，非本技能数据，已排除）。最终按英雄锚点3214反推：普通 `urand(1700,2100)`、英雄 `urand(2900,3500)`，均为推算区间，非查证事实。
+修复：`SpellEffects.cpp` `EffectSchoolDMG` 新增 `case 22582: case 37865:`，同暗影新星模式按难度覆盖伤害，不改动法术ID/数据库。
+**状态**：✅ 代码已实施，等待编译部署 + 实测反馈。
+
+### ⚠️ 系统性发现：`SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL` 缩放溢出是批量问题，不止个案（2026-08-12）
+排查冰霜震击时用 SQL 批量筛查"带 `SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL` 属性 + `spellLevel` 远低于实际施法怪物等级（差值≥30级）"这个特征，一次性查出 **204个不同法术、涉及247个不同怪物**存在同一种缩放溢出隐患，覆盖奥金顿、蒸汽地窖、赛斯克大厅、卡拉波神殿、影月谷野外怪、旧希尔斯布莱德等大量副本和野外区域（已确认的"暗影新星""冰霜震击"都在这份清单里，验证了排查逻辑正确）。
+**结论**：不适合继续用"发现一个、手动查资料、加一个`case`"这种一对一方式处理，204个技能逐个查证不现实。
+
+**根因定位到公式本身**：`Object.cpp` 的 `CalculateSpellEffectValue`，`value = value * (CLSPowerCreature / CLSPowerSpell)`，`CLSPower*` 来自 `creature_template_classlevelstats.BaseDamage`——这张表按等级增长是陡峭曲线而非线性（同职业20级→70级差21.6倍），公式本身没有任何"等级差过大就封顶/失效"的保护，导致被套用到"20级模板 vs 70级施法者"这种远超设计初衷的极端场景时直接崩坏。**已核实这段代码（含 `// TODO: Drastically beter than before, but still needs some additional aura scaling research` 这条注释）在 upstream mangos-tbc 里逐字节一致存在**——不是 Nmangos-tbc 自己的问题，是继承自官方仓库的共享缺陷，官方自己也承认这块"还需要进一步研究"，不是我们独有的坑。
+
+**候选修复方向**（都是引擎级改动，需要专门离线核算校准后再动手，不适合顺手改）：
+- **方案A**：给缩放倍数本身设上限（`std::min(ratio, 上限)`）——简单，但"上限该定多少"缺乏依据，容易一刀切过头或不够。
+- **方案B（倾向）**：不直接限制倍数，而是限制查表用的"等级差"（比如 `effectiveSpellLevel = max(spellProto->spellLevel, casterLevel - 20)`），让缩放曲线本身不被拉到离谱区间，同时数值来源仍然是同一套曲线，不是拍脑袋的魔法数字。
+- 改动前必须用"暗影新星""冰霜震击"这两个已经手动验证过的正确答案做校准（改完公式后重新算一遍这两个技能，看结果跟目前手动 `case` 覆盖的数值是否接近），改动后要评估要不要撤掉这两个手动 `case` 覆盖（避免两套机制叠加）。
+
+**状态**：⏸️ 待办，尚未开始处理，本次只处理了清单里已被玩家反馈的"暗影新星""冰霜震击"两个，其余202个 + 公式级修复作为独立大任务留待后续排期。排查用的 SQL：
+```sql
+SELECT DISTINCT s.Id, s.SpellName, s.spellLevel, ct.entry, ct.name, ct.MinLevel, ct.Rank,
+       (CAST(ct.MinLevel AS SIGNED) - CAST(s.spellLevel AS SIGNED)) AS levelGap
+FROM spell_template s
+JOIN creature_spell_list csl ON csl.SpellId = s.Id
+JOIN creature_template ct ON ct.SpellList = csl.Id
+WHERE (s.Attributes & 0x80000) != 0
+  AND s.spellLevel > 0
+  AND (CAST(ct.MinLevel AS SIGNED) - CAST(s.spellLevel AS SIGNED)) >= 30
+ORDER BY levelGap DESC;
+```
+
 ---
 
 ## upstream（官方 cmangos/mangos-tbc）逐个提交审查
