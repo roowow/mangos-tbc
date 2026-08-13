@@ -430,11 +430,12 @@ void Spell::EffectSchoolDMG(SpellEffectIndex eff_idx)
                     case 9613:                              // Shadow Bolt - extremely widely shared generic template (60+ unrelated casters, all level ranges)
                     {
                         // only override for Shadow Council Warlock (Shadowmoon Valley open-world trash, non-elite,
-                        // level 67) and Deathforge Summoner (same zone/tier, level 68-69, reusing the same range);
+                        // level 67), Deathforge Summoner (same zone/tier, level 68-69) and Dark Conclave Shadowmancer
+                        // (same zone/tier, level 67-68) - all reusing the same range;
                         // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL with spellLevel 20, which at this
                         // level range inflates the roll far beyond what a regular (non-elite) trash mob should deal -
                         // other casters of this shared spell ID (dozens, spanning vanilla to TBC content) are left alone
-                        if (m_caster->GetEntry() == 21302 || m_caster->GetEntry() == 20872)
+                        if (m_caster->GetEntry() == 21302 || m_caster->GetEntry() == 20872 || m_caster->GetEntry() == 19826)
                             damage = urand(350, 600);
                         break;
                     }

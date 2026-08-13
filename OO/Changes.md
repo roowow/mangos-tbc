@@ -113,6 +113,11 @@ Grandmaster Vorpil 自己的暗影新星（33846）有同样"不分难度"问题
 修复：`SpellEffects.cpp` `EffectSchoolDMG` 新增 `case 37988:` 和 `case 37945:`，均无需entry判断（唯一使用者），不改动法术ID/数据库。
 **状态**：✅ 代码已实施，等待编译部署 + 实测反馈。
 
+### 影月谷"黑暗教团暗影法师"暗影箭伤害过高（2026-08-13）
+玩家反馈黑暗教团暗影法师（entry 19826，67-68级，`Rank=0`非精英，`UnitClass=2`）"暗影箭" = 法术9613，还是那个60+共用的老熟人，之前反查共用列表时就见过这个entry。在已有的 `case 9613:` 里追加 `m_caster->GetEntry() == 19826` 判断，级别正好卡在"暗影议会术士"(67)和"死亡熔炉召唤者"(68-69)中间，沿用同一数值 `urand(350,600)`。
+修复：`SpellEffects.cpp` `EffectSchoolDMG` 里 `case 9613:` 再追加一个entry条件，不改动法术ID/数据库。
+**状态**：✅ 代码已实施，等待编译部署 + 实测反馈。
+
 ### 影月谷"军团要塞"玛卡扎顿火焰之雨伤害过高（2026-08-12）
 玩家反馈影月谷军团要塞（Legion Hold）任务精英玛卡扎顿（entry 21501，68-69级，`Rank=1`精英，`UnitClass=1`，两个深渊魔王之一，走 `creature_ai_scripts`）"火焰之雨"（法术38741）伤害异常。同一根因（`Attributes` 含 `SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL`，`spellLevel=20`）。
 **这次跟之前几个的关键区别——技能本身就是持续伤害光环，不走 `EffectSchoolDMG`**：`Effect1=27`(PERSIST_AREA_AURA) + `EffectApplyAuraName1=3`(PERIODIC_DAMAGE，每3秒跳一次)，是纯粹的地面持续伤害区域，不是"直接命中"类效果，所以完全不会经过前8次用来修复的 `Spell::EffectSchoolDMG` 函数。**修复位置改在缩放公式本身发生的地方**（`Object.cpp` 的 `CalculateSpellEffectValue`，针对 `spellProto->Id`+`effect_index` 直接覆盖），这也是排查这条时才发现"毒液箭DoT遭漏修"这个问题的契机（见上面订正）。
