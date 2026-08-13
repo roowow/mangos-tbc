@@ -338,13 +338,29 @@ void Spell::EffectSchoolDMG(SpellEffectIndex eff_idx)
                         damage = isRegular ? urand(1700, 2100) : urand(2900, 3500);
                         break;
                     }
-                    case 12675:                             // Frostbolt - Coilfang Sorceress (normal)
+                    case 12675:                             // Frostbolt - Coilfang Sorceress (normal) AND Wastewalker Slave (heroic Slave Pens)
                     case 37930:                             // Frostbolt - Coilfang Sorceress (heroic)
                     {
                         // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL with spellLevel 20;
                         // at level 70 this inflates the roll far beyond intended, overriding with the
-                        // intended range instead (heroic keeps the ~2x ratio already present in the raw data)
+                        // intended range instead (heroic keeps the ~2x ratio already present in the raw data).
+                        // 12675 is shared by two unrelated creatures across two dungeons (Coilfang Sorceress
+                        // normal in Steamvault, Wastewalker Slave heroic in Slave Pens) but they turn out to be
+                        // the same tier - Schaka/TBC-research issue #8 independently confirms Wastewalker Slave
+                        // heroic Frostbolt at 1300-1780, matching this range almost exactly
                         damage = m_spellInfo->Id == 12675 ? urand(1290, 1760) : urand(2580, 3520);
+                        break;
+                    }
+                    case 15531:                             // Frost Nova - shared template used by several unrelated casters
+                    {
+                        // only override for Wastewalker Slave (heroic Slave Pens, entry 19902); other casters of
+                        // this shared spell ID (Coilfang Sorceress's own kit, Tidal Surger normal/heroic) haven't
+                        // been reported/researched yet and are deliberately left untouched.
+                        // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL with spellLevel 20; at level 70-71
+                        // this inflates the roll far beyond intended. Reference: Schaka/TBC-research issue #8
+                        // ("Slave Pens Heroic pre-nerf") lists Wastewalker Slave Frost Nova at 1040-1180
+                        if (m_caster->GetEntry() == 19902)
+                            damage = urand(1040, 1180);
                         break;
                     }
                     case 37272:                             // Poison Bolt - Bog Overlord (normal)
@@ -358,13 +374,17 @@ void Spell::EffectSchoolDMG(SpellEffectIndex eff_idx)
                         damage = m_spellInfo->Id == 37272 ? urand(1000, 1675) : urand(2000, 3350);
                         break;
                     }
-                    case 15234:                             // Lightning Bolt - Coilfang Siren (normal)
-                    case 37664:                             // Lightning Bolt - Coilfang Siren (heroic)
+                    case 15234:                             // Lightning Bolt - shared template (Coilfang Siren normal + Coilfang Enchantress normal)
+                    case 37664:                             // Lightning Bolt - shared template (Coilfang Siren heroic + Coilfang Enchantress heroic)
                     {
+                        // only override for Coilfang Siren (entries 17801 normal / 20623 heroic); Coilfang
+                        // Enchantress (17961 normal / 19887 heroic) also casts this shared spell ID but hasn't
+                        // been reported/researched yet, so it's deliberately left untouched for now.
                         // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL with spellLevel 20;
                         // at level 70 this inflates the roll far beyond intended, overriding with the
                         // intended range instead (heroic keeps the ~2x ratio already present in the raw data)
-                        damage = m_spellInfo->Id == 15234 ? urand(1200, 1750) : urand(2400, 3500);
+                        if (m_caster->GetEntry() == 17801 || m_caster->GetEntry() == 20623)
+                            damage = m_spellInfo->Id == 15234 ? urand(1200, 1750) : urand(2400, 3500);
                         break;
                     }
                     case 16102:                             // Flamestrike - shared template used by many creatures of different levels (57-71+)
@@ -394,6 +414,64 @@ void Spell::EffectSchoolDMG(SpellEffectIndex eff_idx)
                         // casters of this shared spell ID (much lower level old-world mobs) are left alone
                         if (m_caster->GetEntry() == 21911)
                             damage = urand(500, 800);
+                        break;
+                    }
+                    case 13901:                             // Arcane Bolt - shared template used by several unrelated casters
+                    {
+                        // only override for Skettis Windwalker (Terokkar Forest / Skettis open-world trash, non-elite,
+                        // same zone/tier as Skettis Soulcaller above - reusing the same target range);
+                        // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL with spellLevel 20, which at level 70-71
+                        // inflates the roll far beyond what a regular (non-elite) trash mob should deal - other
+                        // casters of this shared spell ID are left alone
+                        if (m_caster->GetEntry() == 21649)
+                            damage = urand(500, 800);
+                        break;
+                    }
+                    case 9613:                              // Shadow Bolt - extremely widely shared generic template (60+ unrelated casters, all level ranges)
+                    {
+                        // only override for Shadow Council Warlock (Shadowmoon Valley open-world trash, non-elite,
+                        // level 67) and Deathforge Summoner (same zone/tier, level 68-69, reusing the same range);
+                        // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL with spellLevel 20, which at this
+                        // level range inflates the roll far beyond what a regular (non-elite) trash mob should deal -
+                        // other casters of this shared spell ID (dozens, spanning vanilla to TBC content) are left alone
+                        if (m_caster->GetEntry() == 21302 || m_caster->GetEntry() == 20872)
+                            damage = urand(350, 600);
+                        break;
+                    }
+                    case 36247:                             // Fel Fireball - shared template used by Enraged Fire Spirit and Incandescent Fel Spark
+                    {
+                        // only override for Enraged Fire Spirit (Shadowmoon Valley quest 10458, open-world, non-elite);
+                        // Incandescent Fel Spark also casts this shared spell ID but hasn't been reported yet, so it's
+                        // deliberately left untouched. Spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL with
+                        // spellLevel 20, which at level 68-69 inflates the roll far beyond what a regular (non-elite)
+                        // trash mob should deal
+                        if (m_caster->GetEntry() == 21061)
+                            damage = urand(400, 700);
+                        break;
+                    }
+                    case 38498:                             // Fiery Boulder - Enraged Earth Spirit (not shared with any other creature)
+                    {
+                        // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL with spellLevel 20, which at level
+                        // 68-69 inflates the roll far beyond what a regular (non-elite) trash mob should deal
+                        damage = urand(400, 700);
+                        break;
+                    }
+                    case 37988:                             // Ancient Fire - Eclipsion Archmage (not shared); the actual damage
+                                                              // dealer triggered every 4 sec by spell 37986's PERIODIC_TRIGGER_SPELL
+                                                              // aura (37986 itself is unaffected by the scaling bug - only the
+                                                              // triggered spell, which carries its own SCALES_WITH_CREATURE_LEVEL, is)
+                    {
+                        // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL with spellLevel 20, which at level
+                        // 68-69 inflates the roll far beyond what a regular (non-elite) trash mob should deal
+                        damage = urand(400, 700);
+                        break;
+                    }
+                    case 37945:                             // Fel Fireball - Greater Felfire Diemetradon (not shared); same raw
+                                                              // template values as spell 36247 (Enraged Fire Spirit), reusing range
+                    {
+                        // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL with spellLevel 20, which at level
+                        // 68-69 inflates the roll far beyond what a regular (non-elite) trash mob should deal
+                        damage = urand(400, 700);
                         break;
                     }
                     // Lightning Strike

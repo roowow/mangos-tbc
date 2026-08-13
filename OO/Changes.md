@@ -85,6 +85,34 @@ Grandmaster Vorpil 自己的暗影新星（33846）有同样"不分难度"问题
 修复：`SpellEffects.cpp` `EffectSchoolDMG` 新增 `case 20298:`，内部判断施法者entry，其他共用同一法术ID的怪物不受影响，不改动法术ID/数据库。
 **状态**：✅ 代码已实施，等待编译部署 + 实测反馈。
 
+### 特罗凯森林"斯克提斯风行者"奥术箭伤害过高（2026-08-13）
+玩家反馈同一区域（Skettis，map 530）风行者（entry 21649，70-71级，`Rank=0`非精英，`UnitClass=2`，走 `creature_ai_scripts`）"奥术箭"（法术13901）伤害过高，跟"斯克提斯唤魂者"是**同一区域、同一等级档、同一非精英强度**的怪，同一根因。法术ID同样被 Vir'aani Arcanist、Warp Monstrosity、Lady Shav'rar、Sunfury Summoner、Netherwing Ally、Darkcrest Sorceress 等好几个不相关怪物共用，只判断施法者entry才覆盖。
+数值：没有外部参考数据，直接沿用"斯克提斯唤魂者"同一档位的 `urand(500,800)`，保持同区域怪物强度一致。
+修复：`SpellEffects.cpp` `EffectSchoolDMG` 新增 `case 13901:`，内部判断 `m_caster->GetEntry() == 21649` 才覆盖，不改动法术ID/数据库。
+**状态**：✅ 代码已实施，等待编译部署 + 实测反馈。
+
+### 影月谷"暗影议会术士"暗影箭伤害过高（2026-08-13）
+玩家反馈影月谷暗影议会术士（entry 21302，67级，`Rank=0`非精英，`UnitClass=2`，走 `creature_ai_scripts`，map 530）"暗影箭"（法术9613）伤害过高，同一根因。
+**这是目前遇到过共用范围最广的法术ID**：`creature_ai_scripts` 查到 60+ 个完全不相关的怪物在用同一个 spell 9613，横跨经典旧世界（藏宝海湾/祖尔法拉/通灵学院等）到TBC全区域（奈瑟匿域/太阳之井/奥金顿等），只判断施法者是这个怪（`m_caster->GetEntry() == 21302`）才覆盖，其余全部不动。
+数值：网上搜到"544-607"的说法核实后发现是**另一个法术ID(27209，玩家职业技能版本)**的数据，不是这个NPC通用模板，没有采用，避免张冠李戴。没有可用外部参考。按同一非精英野怪档位、67级比之前几个68-71级的略低，给 `urand(350,600)`，保持等级递进关系。
+修复：`SpellEffects.cpp` `EffectSchoolDMG` 新增 `case 9613:`，内部判断施法者entry才覆盖，不改动法术ID/数据库。
+**状态**：✅ 代码已实施，等待编译部署 + 实测反馈。
+
+### 影月谷"死亡熔炉召唤者"+"愤怒的火灵"+"愤怒的地灵"伤害过高（2026-08-13，一次性提交3条）
+玩家一次反馈了3个同区域（影月谷 quest 10458"愤怒的火与土之魂"，用图腾捕获元素魂魄的任务，map 530）的怪，均68-69级、`Rank=0`非精英、走 `creature_ai_scripts`，同一根因：
+1. **死亡熔炉召唤者（20872）暗影箭 = 法术9613**——就是上面"暗影议会术士"那个60+共用的法术ID，直接在已有的 `case 9613:` 里追加 `m_caster->GetEntry() == 20872` 判断，沿用同一数值 `urand(350,600)`。
+2. **愤怒的火灵（21061）邪能火球 = 法术36247**——法术ID被 "Incandescent Fel Spark"（22323，70-71级，另一区域）共用，该怪没人反馈过，不动，只判断 `m_caster->GetEntry() == 21061`。没有外部参考数据，按非精英野怪档位给 `urand(400,700)`（跟"库斯卡海妖"同档）。
+3. **愤怒的地灵（21050）火焰投石 = 法术38498**——**未被任何其他怪物共用**，唯一使用者，无需entry判断，直接按法术ID覆盖，同样给 `urand(400,700)`。
+修复：`SpellEffects.cpp` `EffectSchoolDMG` 里 `case 9613:` 追加一个entry条件，新增 `case 36247:`（entry判断）和 `case 38498:`（无需entry判断，唯一使用者），均不改动法术ID/数据库。
+**状态**：✅ 代码已实施，等待编译部署 + 实测反馈。
+
+### 影月谷"日蚀法师"+"大型魔火双帆龙"伤害过高（2026-08-13）
+同区域另外两个反馈，均68-69级、`Rank=0`非精英：
+1. **日蚀法师（19796）"上古之火"，玩家给的法术是37986，但排查后发现要修的其实是37988**——37986本身是一个"每4秒触发另一个法术"的周期光环（`EffectApplyAuraName1=23`=`PERIODIC_TRIGGER_SPELL`），这个光环类型**不在缩放判定的"伤害类光环"名单里**（判定名单是 `PERIODIC_DAMAGE`/`PERIODIC_LEECH`/`SCHOOL_ABSORB`/`POWER_BURN_MANA`/`PERIODIC_TRIGGER_SPELL_WITH_VALUE`/`PERIODIC_MANA_LEECH` 这6种，`PERIODIC_TRIGGER_SPELL` 不含"_WITH_VALUE"后缀，不在其中），所以37986自己不受影响；真正造成伤害的是它触发的**法术37988**（同名"Ancient Fire"，独立的直接命中效果，自己带 `SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL`），这个才是bug真正发生的地方。未被共用，直接按法术ID覆盖，同档给 `urand(400,700)`。
+2. **大型魔火双帆龙（21462）邪能火球 = 法术37945**——跟"愤怒的火灵"的36247是完全相同的原始数值模板（只是ID不同），未被共用，沿用同一数值 `urand(400,700)`。
+修复：`SpellEffects.cpp` `EffectSchoolDMG` 新增 `case 37988:` 和 `case 37945:`，均无需entry判断（唯一使用者），不改动法术ID/数据库。
+**状态**：✅ 代码已实施，等待编译部署 + 实测反馈。
+
 ### 影月谷"军团要塞"玛卡扎顿火焰之雨伤害过高（2026-08-12）
 玩家反馈影月谷军团要塞（Legion Hold）任务精英玛卡扎顿（entry 21501，68-69级，`Rank=1`精英，`UnitClass=1`，两个深渊魔王之一，走 `creature_ai_scripts`）"火焰之雨"（法术38741）伤害异常。同一根因（`Attributes` 含 `SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL`，`spellLevel=20`）。
 **这次跟之前几个的关键区别——技能本身就是持续伤害光环，不走 `EffectSchoolDMG`**：`Effect1=27`(PERSIST_AREA_AURA) + `EffectApplyAuraName1=3`(PERIODIC_DAMAGE，每3秒跳一次)，是纯粹的地面持续伤害区域，不是"直接命中"类效果，所以完全不会经过前8次用来修复的 `Spell::EffectSchoolDMG` 函数。**修复位置改在缩放公式本身发生的地方**（`Object.cpp` 的 `CalculateSpellEffectValue`，针对 `spellProto->Id`+`effect_index` 直接覆盖），这也是排查这条时才发现"毒液箭DoT遭漏修"这个问题的契机（见上面订正）。
@@ -93,6 +121,20 @@ Grandmaster Vorpil 自己的暗影新星（33846）有同样"不分难度"问题
 修复：`Object.cpp` `CalculateSpellEffectValue` 补充判断 `effect_index==EFFECT_INDEX_0 && spellProto->Id==38741 && unitCaster->GetEntry()==21501` 才覆盖，其他共用同一法术ID的怪物不受影响，不改动法术ID/数据库。
 **状态**：✅ 代码已实施，等待编译部署 + 实测反馈。
 
+### 英雄奴隶围栏"荒土奴隶"寒冰箭+冰霜新星伤害过高（2026-08-13）
+玩家反馈英雄奴隶围栏（Slave Pens Heroic，Coilfang Reservoir）荒土奴隶（玩家给的entry 17963 是**普通**难度实体，62-63级；实际触发这两个法术的是它的英雄版 **entry 19902 "Wastewalker Slave (1)"，70-71级**，`creature_spell_list Id=1990201`）"寒冰箭"（法术**12675**）+"冰霜新星"（法术**15531**）伤害过高。
+**排查中发现一个之前遗漏的严重问题——早前几次"蒸汽地窖"修复的共用检查不完整**：当时对 22582/37865（冰霜震击）、37272/37862（毒液箭）确实查过 `creature_spell_list` 确认专属，但对 **12675/37930（寒冰箭）和 15234/37664（闪电箭）没有反查这几个法术ID是否被其他 `creature_spell_list` 复用**。这次反查全部8个已修复的蒸汽地窖法术ID，发现：
+- `12675` 被 **5个** spell_list 引用（其中2个是有效怪物：Coilfang Sorceress普通=17722、**Wastewalker Slave英雄=19902**，其余3个是孤儿数据、未被任何怪物实际使用）
+- `15234` 被 **3个** spell_list 引用（Coilfang Siren普通=17801、Coilfang Enchantress普通=17961，另1个孤儿）
+- `37664` 被 **2个** spell_list 引用（Coilfang Enchantress英雄=19887、Coilfang Siren英雄=20623）
+- `22582`/`37865`/`37272`/`37862` 确认仍然是单一专属，之前的核实没问题
+
+**修复**：
+1. **寒冰箭数值不用改**——巧的是 `Schaka/TBC-research` issue #8（"Slave Pens Heroic pre-nerf"）独立记录荒土奴隶(英雄)寒冰箭为"1300-1780"，跟我们已经定的普通盘牙巫师数值（1290-1760）几乎完全一致，两个不同副本不同难度的怪碰巧是同一强度层级。代码逻辑上补了注释说明这个ID被两边共用，不需要额外的施法者判断（因为两边用同一个值都对）。
+2. **新增"冰霜新星"（15531）针对荒土奴隶(19902)的覆盖**：`urand(1040,1180)`，同样来自 issue #8 的荒土奴隶记录。这个法术还被 Coilfang Sorceress(英雄)自己的技能组、Tidal Surger(普通/英雄) 共用，都还没有玩家反馈/没研究过，特意加了 `m_caster->GetEntry()==19902` 判断，不动其他几个未经研究的怪。
+3. **补上"闪电箭"（15234/37664）的施法者判断**：加了 `m_caster->GetEntry()==17801 || ==20623`（只精确命中 Coilfang Siren 普通/英雄），Coilfang Enchantress（17961普通/19887英雄）没人反馈过，故意不去动它，避免用研究给Coilfang Siren的数值去套一个完全没验证过的怪。
+**状态**：✅ 代码已实施，等待编译部署 + 实测反馈。以后核对204个清单剩余技能时，`creature_spell_list` 的共用检查要对每一个法术ID都做，不能假设"看起来像专属的就是专属"。
+
 ### ⚠️ 系统性发现：`SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL` 缩放溢出是批量问题，不止个案（2026-08-12）
 排查冰霜震击时用 SQL 批量筛查"带 `SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL` 属性 + `spellLevel` 远低于实际施法怪物等级（差值≥30级）"这个特征，一次性查出 **204个不同法术、涉及247个不同怪物**存在同一种缩放溢出隐患，覆盖奥金顿、蒸汽地窖、赛斯克大厅、卡拉波神殿、影月谷野外怪、旧希尔斯布莱德等大量副本和野外区域（已确认的"暗影新星""冰霜震击"都在这份清单里，验证了排查逻辑正确）。
 **结论**：不适合继续用"发现一个、手动查资料、加一个`case`"这种一对一方式处理，204个技能逐个查证不现实。
@@ -100,6 +142,8 @@ Grandmaster Vorpil 自己的暗影新星（33846）有同样"不分难度"问题
 **排查范围有缺口，实际受影响数量可能更多**：本轮后续修复"烈焰风暴"（16102）、"水箭"（32011）时发现，这两个都是通过老式 `creature_ai_scripts` 系统施法（`creature_template.SpellList=0`），而当初排查204个用的 SQL 只 JOIN 了 `creature_spell_list`（新版系统），完全没覆盖走 `creature_ai_scripts` 的这批怪——204这个数字只是"新系统"部分，"老系统"部分还没排查过，实际总数会更多。以后系统性修复时需要把这条路径也覆盖进筛查 SQL。
 
 **另一处缺口——判定逻辑不是只看"效果类型"，还要看"光环类型"，且不是所有受影响效果都走同一个下游函数**：排查"毒液箭"时发现，缩放判定优先看 `EffectApplyAuraName`（光环类型是 `PERIODIC_DAMAGE`/`PERIODIC_LEECH`/`SCHOOL_ABSORB`/`POWER_BURN_MANA`/`PERIODIC_TRIGGER_SPELL_WITH_VALUE`/`PERIODIC_MANA_LEECH` 这几种照样会被缩放），只有查不到光环类型时才退回看"效果类型"（`SCHOOL_DAMAGE`等）。之前几次修复只处理了"直接命中"这一种（走 `Spell::EffectSchoolDMG`），漏了"持续伤害光环"这一种（`Effect=27`纯光环技能如"火焰之雨"完全不经过 `EffectSchoolDMG`，必须在 `CalculateSpellEffectValue` 本身覆盖）——204个清单里可能还有别的技能是这种"纯光环"或"直接命中+被忽略的DoT"结构，逐个核对时要把 `EffectApplyAuraName1/2/3` 也纳入检查，不能只看 `Effect1/2/3` 的表面类型。
+
+**第三处缺口——法术ID可能只是"容器"，真正的伤害来自它触发的另一个法术**：排查"日蚀法师"上古之火时发现，玩家反馈的法术ID（37986）本身是 `PERIODIC_TRIGGER_SPELL`（光环类型23，纯粹"每N秒触发一次另一个法术"，不在缩放判定名单里，自己不受影响），真正带 `SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL`、造成伤害的是它 `EffectTriggerSpell1` 指向的另一个独立法术ID（37988）。以后核对204清单/处理新反馈时，如果法术本身查出来"没有缩放属性"或"效果类型对不上"，要顺着 `EffectTriggerSpell1/2/3` 再查一层，不能看到"没问题"就直接放过。
 
 **根因定位到公式本身**：`Object.cpp` 的 `CalculateSpellEffectValue`，`value = value * (CLSPowerCreature / CLSPowerSpell)`，`CLSPower*` 来自 `creature_template_classlevelstats.BaseDamage`——这张表按等级增长是陡峭曲线而非线性（同职业20级→70级差21.6倍），公式本身没有任何"等级差过大就封顶/失效"的保护，导致被套用到"20级模板 vs 70级施法者"这种远超设计初衷的极端场景时直接崩坏。**已核实这段代码（含 `// TODO: Drastically beter than before, but still needs some additional aura scaling research` 这条注释）在 upstream mangos-tbc 里逐字节一致存在**——不是 Nmangos-tbc 自己的问题，是继承自官方仓库的共享缺陷，官方自己也承认这块"还需要进一步研究"，不是我们独有的坑。
 
