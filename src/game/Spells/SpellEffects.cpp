@@ -323,9 +323,13 @@ void Spell::EffectSchoolDMG(SpellEffectIndex eff_idx)
                     {
                         // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL with spellLevel 20;
                         // at level 70 this inflates the roll to ~3200-3700, overriding with the
-                        // intended difficulty-appropriate range instead
-                        bool isRegular = m_caster->GetMap()->IsRegularDifficulty();
-                        damage = isRegular ? urand(1000, 1500) : urand(2000, 2500);
+                        // intended difficulty-appropriate range instead.
+                        // Retired 2026-08-14: normal branch is within ~13% of the generic formula, but heroic
+                        // is ~47% below it (formula predicts ~1450-1650 vs the 2000-2500 set here) - by far the
+                        // largest gap of anything retired so far. User explicitly chose to retire both anyway
+                        // (consistent with the open-world batch decision) despite the heroic drop - see OO/Changes.md.
+                        // bool isRegular = m_caster->GetMap()->IsRegularDifficulty();
+                        // damage = isRegular ? urand(1000, 1500) : urand(2000, 2500);
                         break;
                     }
                     case 22582:                             // Frost Shock - Coilfang Oracle (normal)
@@ -333,9 +337,14 @@ void Spell::EffectSchoolDMG(SpellEffectIndex eff_idx)
                     {
                         // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL with spellLevel 20;
                         // at level 70 this inflates the roll to ~7700+, overriding with the
-                        // intended difficulty-appropriate range instead
-                        bool isRegular = m_caster->GetMap()->IsRegularDifficulty();
-                        damage = isRegular ? urand(1700, 2100) : urand(2900, 3500);
+                        // intended difficulty-appropriate range instead.
+                        // Retired 2026-08-14: Effect1 (the negative EffectBasePoints1 that originally looked
+                        // structurally odd) is actually the unrelated MOD_DECREASE_SPEED snare, not damage - it
+                        // was never scaled by this formula to begin with. The real damage is Effect2 (clean
+                        // positive base points), which the generic dungeon-tier formula now reproduces within
+                        // ~5% (normal, just under the lower bound) and within-range (heroic) - see OO/Changes.md.
+                        // bool isRegular = m_caster->GetMap()->IsRegularDifficulty();
+                        // damage = isRegular ? urand(1700, 2100) : urand(2900, 3500);
                         break;
                     }
                     case 12675:                             // Frostbolt - Coilfang Sorceress (normal) AND Wastewalker Slave (heroic Slave Pens)
@@ -347,8 +356,10 @@ void Spell::EffectSchoolDMG(SpellEffectIndex eff_idx)
                         // 12675 is shared by two unrelated creatures across two dungeons (Coilfang Sorceress
                         // normal in Steamvault, Wastewalker Slave heroic in Slave Pens) but they turn out to be
                         // the same tier - Schaka/TBC-research issue #8 independently confirms Wastewalker Slave
-                        // heroic Frostbolt at 1300-1780, matching this range almost exactly
-                        damage = m_spellInfo->Id == 12675 ? urand(1290, 1760) : urand(2580, 3520);
+                        // heroic Frostbolt at 1300-1780, matching this range almost exactly.
+                        // Retired 2026-08-14: both branches are within ~1% of the generic dungeon-tier formula
+                        // (WorldObject::CalculateSpellEffectValue), see OO/Changes.md.
+                        // damage = m_spellInfo->Id == 12675 ? urand(1290, 1760) : urand(2580, 3520);
                         break;
                     }
                     case 15531:                             // Frost Nova - shared template used by several unrelated casters
@@ -358,9 +369,11 @@ void Spell::EffectSchoolDMG(SpellEffectIndex eff_idx)
                         // been reported/researched yet and are deliberately left untouched.
                         // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL with spellLevel 20; at level 70-71
                         // this inflates the roll far beyond intended. Reference: Schaka/TBC-research issue #8
-                        // ("Slave Pens Heroic pre-nerf") lists Wastewalker Slave Frost Nova at 1040-1180
-                        if (m_caster->GetEntry() == 19902)
-                            damage = urand(1040, 1180);
+                        // ("Slave Pens Heroic pre-nerf") lists Wastewalker Slave Frost Nova at 1040-1180.
+                        // Retired 2026-08-14: within ~1% of the generic dungeon-tier formula, see OO/Changes.md.
+                        // Other (untouched) casters of this shared ID now also get a reasonable value for free.
+                        // if (m_caster->GetEntry() == 19902)
+                        //     damage = urand(1040, 1180);
                         break;
                     }
                     case 37272:                             // Poison Bolt - Bog Overlord (normal)
@@ -369,9 +382,10 @@ void Spell::EffectSchoolDMG(SpellEffectIndex eff_idx)
                         // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL with spellLevel 20;
                         // at level 70 this inflates the initial hit far beyond intended, overriding with the
                         // intended range instead (heroic keeps the ~2x ratio already present in the raw data);
-                        // the periodic nature DoT (effect 2) is ALSO scaled by the same bug - see the matching
-                        // override in WorldObject::CalculateSpellEffectValue (Object.cpp)
-                        damage = m_spellInfo->Id == 37272 ? urand(1000, 1675) : urand(2000, 3350);
+                        // the periodic DoT (effect 2) is ALSO scaled by the same bug - see the matching
+                        // (also retired) override in WorldObject::CalculateSpellEffectValue (Object.cpp).
+                        // Retired 2026-08-14: both branches are within ~1% of the generic dungeon-tier formula.
+                        // damage = m_spellInfo->Id == 37272 ? urand(1000, 1675) : urand(2000, 3350);
                         break;
                     }
                     case 15234:                             // Lightning Bolt - shared template (Coilfang Siren normal + Coilfang Enchantress normal)
@@ -382,79 +396,89 @@ void Spell::EffectSchoolDMG(SpellEffectIndex eff_idx)
                         // been reported/researched yet, so it's deliberately left untouched for now.
                         // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL with spellLevel 20;
                         // at level 70 this inflates the roll far beyond intended, overriding with the
-                        // intended range instead (heroic keeps the ~2x ratio already present in the raw data)
-                        if (m_caster->GetEntry() == 17801 || m_caster->GetEntry() == 20623)
-                            damage = m_spellInfo->Id == 15234 ? urand(1200, 1750) : urand(2400, 3500);
+                        // intended range instead (heroic keeps the ~2x ratio already present in the raw data).
+                        // Retired 2026-08-14: both branches within ~2% of the generic dungeon-tier formula,
+                        // see OO/Changes.md. Coilfang Enchantress now also gets a reasonable value for free.
+                        // if (m_caster->GetEntry() == 17801 || m_caster->GetEntry() == 20623)
+                        //     damage = m_spellInfo->Id == 15234 ? urand(1200, 1750) : urand(2400, 3500);
                         break;
                     }
                     case 16102:                             // Flamestrike - shared template used by many creatures of different levels (57-71+)
                     {
-                        // only override for Illidari Highlord (Battle of the Crimson Watch, Shadowmoon Valley);
-                        // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL with spellLevel 20, which at level 71
-                        // inflates the roll far beyond intended - other casters of this shared spell ID are left alone
-                        if (m_caster->GetEntry() == 19797)
-                            damage = urand(1500, 2200);
+                        // Illidari Highlord (Battle of the Crimson Watch, open-world elite).
+                        // Retired 2026-08-14: user chose to trust the generic (open-world) formula despite the
+                        // ~35% gap found earlier (formula ≈1365 vs manual 1500-2200) - see OO/Changes.md.
+                        // if (m_caster->GetEntry() == 19797)
+                        //     damage = urand(1500, 2200);
+                        // Shadowmoon Summoner (heroic Blood Furnace, entry 18617): was originally lumped in with
+                        // Illidari Highlord on "same Rank=1 elite" reasoning, reclassified 2026-08-14 to its own
+                        // dungeon-tier estimate, then retired the same day once the dungeon correction was folded
+                        // into the generic formula (within ~2%) - this branch existed only to hand-reproduce it.
+                        // else if (m_caster->GetEntry() == 18617)
+                        //     damage = urand(2050, 2400);
                         break;
                     }
                     case 32011:                             // Water Bolt - shared template used by several naga/murloc-type casters
                     {
-                        // only override for Coilskar Siren (Shadowmoon Valley open-world trash, non-elite);
-                        // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL with spellLevel 20, which at level 68-69
-                        // inflates the roll far beyond what a regular (non-elite) trash mob should deal - other
-                        // casters of this shared spell ID (elites/instance mobs) are left alone
-                        if (m_caster->GetEntry() == 19768)
-                            damage = urand(400, 700);
+                        // only override for Coilskar Siren (Shadowmoon Valley open-world trash, non-elite); other
+                        // casters of this shared spell ID (elites/instance mobs) are left alone.
+                        // Retired 2026-08-14: user chose to trust the generic (open-world) formula despite the
+                        // ~30% gap found earlier (formula ≈790 vs manual 400-700) - see OO/Changes.md.
+                        // if (m_caster->GetEntry() == 19768)
+                        //     damage = urand(400, 700);
                         break;
                     }
                     case 20298:                             // Shadow Bolt - shared template used by several unrelated low-level casters
                     {
                         // only override for Skettis Soulcaller (Terokkar Forest / Skettis open-world trash, non-elite);
-                        // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL with spellLevel 20, which at level 70-71
-                        // inflates the roll far beyond what a regular (non-elite) trash mob should deal - other
-                        // casters of this shared spell ID (much lower level old-world mobs) are left alone
-                        if (m_caster->GetEntry() == 21911)
-                            damage = urand(500, 800);
+                        // other casters of this shared spell ID (much lower level old-world mobs) are left alone.
+                        // Retired 2026-08-14: user chose to trust the generic (open-world) formula despite the
+                        // ~22% gap found earlier (formula ≈534 vs manual 500-800) - see OO/Changes.md.
+                        // if (m_caster->GetEntry() == 21911)
+                        //     damage = urand(500, 800);
                         break;
                     }
                     case 13901:                             // Arcane Bolt - shared template used by several unrelated casters
                     {
                         // only override for Skettis Windwalker (Terokkar Forest / Skettis open-world trash, non-elite,
-                        // same zone/tier as Skettis Soulcaller above - reusing the same target range);
-                        // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL with spellLevel 20, which at level 70-71
-                        // inflates the roll far beyond what a regular (non-elite) trash mob should deal - other
-                        // casters of this shared spell ID are left alone
-                        if (m_caster->GetEntry() == 21649)
-                            damage = urand(500, 800);
+                        // same zone/tier as Skettis Soulcaller above); other casters of this shared spell ID are left alone.
+                        // Retired 2026-08-14: user chose to trust the generic (open-world) formula despite the
+                        // ~92% gap found earlier (formula ≈338 vs manual 500-800, the largest gap in the whole
+                        // open-world group) - see OO/Changes.md.
+                        // if (m_caster->GetEntry() == 21649)
+                        //     damage = urand(500, 800);
                         break;
                     }
                     case 9613:                              // Shadow Bolt - extremely widely shared generic template (60+ unrelated casters, all level ranges)
                     {
                         // only override for Shadow Council Warlock (Shadowmoon Valley open-world trash, non-elite,
                         // level 67), Deathforge Summoner (same zone/tier, level 68-69) and Dark Conclave Shadowmancer
-                        // (same zone/tier, level 67-68) - all reusing the same range;
-                        // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL with spellLevel 20, which at this
-                        // level range inflates the roll far beyond what a regular (non-elite) trash mob should deal -
-                        // other casters of this shared spell ID (dozens, spanning vanilla to TBC content) are left alone
-                        if (m_caster->GetEntry() == 21302 || m_caster->GetEntry() == 20872 || m_caster->GetEntry() == 19826)
-                            damage = urand(350, 600);
+                        // (same zone/tier, level 67-68); other casters of this shared spell ID (dozens, spanning
+                        // vanilla to TBC content) are left alone.
+                        // Retired 2026-08-14: user chose to trust the generic (open-world) formula despite the
+                        // ~22% gap found earlier (formula ≈388 vs manual 350-600) - see OO/Changes.md.
+                        // if (m_caster->GetEntry() == 21302 || m_caster->GetEntry() == 20872 || m_caster->GetEntry() == 19826)
+                        //     damage = urand(350, 600);
                         break;
                     }
                     case 36247:                             // Fel Fireball - shared template used by Enraged Fire Spirit and Incandescent Fel Spark
                     {
                         // only override for Enraged Fire Spirit (Shadowmoon Valley quest 10458, open-world, non-elite);
                         // Incandescent Fel Spark also casts this shared spell ID but hasn't been reported yet, so it's
-                        // deliberately left untouched. Spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL with
-                        // spellLevel 20, which at level 68-69 inflates the roll far beyond what a regular (non-elite)
-                        // trash mob should deal
-                        if (m_caster->GetEntry() == 21061)
-                            damage = urand(400, 700);
+                        // deliberately left untouched.
+                        // Retired 2026-08-14: user chose to trust the generic (open-world) formula despite the
+                        // ~39% gap found earlier (formula ≈395 vs manual 400-700) - see OO/Changes.md.
+                        // if (m_caster->GetEntry() == 21061)
+                        //     damage = urand(400, 700);
                         break;
                     }
                     case 38498:                             // Fiery Boulder - Enraged Earth Spirit (not shared with any other creature)
                     {
                         // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL with spellLevel 20, which at level
-                        // 68-69 inflates the roll far beyond what a regular (non-elite) trash mob should deal
-                        damage = urand(400, 700);
+                        // 68-69 inflates the roll far beyond what a regular (non-elite) trash mob should deal.
+                        // Retired 2026-08-14: within ~7% of the generic (open-world, no dungeon correction)
+                        // formula, one of the few open-world entries close enough to trust - see OO/Changes.md.
+                        // damage = urand(400, 700);
                         break;
                     }
                     case 37988:                             // Ancient Fire - Eclipsion Archmage (not shared); the actual damage
@@ -463,16 +487,21 @@ void Spell::EffectSchoolDMG(SpellEffectIndex eff_idx)
                                                               // triggered spell, which carries its own SCALES_WITH_CREATURE_LEVEL, is)
                     {
                         // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL with spellLevel 20, which at level
-                        // 68-69 inflates the roll far beyond what a regular (non-elite) trash mob should deal
-                        damage = urand(400, 700);
+                        // 68-69 inflates the roll far beyond what a regular (non-elite) trash mob should deal.
+                        // Retired 2026-08-14: user chose to trust the generic (open-world) formula despite the
+                        // ~16% gap found earlier (formula ≈658 vs manual 400-700, the closest of the retired
+                        // open-world group) - see OO/Changes.md.
+                        // damage = urand(400, 700);
                         break;
                     }
                     case 37945:                             // Fel Fireball - Greater Felfire Diemetradon (not shared); same raw
                                                               // template values as spell 36247 (Enraged Fire Spirit), reusing range
                     {
                         // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL with spellLevel 20, which at level
-                        // 68-69 inflates the roll far beyond what a regular (non-elite) trash mob should deal
-                        damage = urand(400, 700);
+                        // 68-69 inflates the roll far beyond what a regular (non-elite) trash mob should deal.
+                        // Retired 2026-08-14: same raw template as 36247 above, same ~39% gap, same user decision
+                        // to trust the generic formula - see OO/Changes.md.
+                        // damage = urand(400, 700);
                         break;
                     }
                     case 12058:                             // Chain Lightning - shared template used by ~20 unrelated casters across many zones/levels
@@ -482,8 +511,9 @@ void Spell::EffectSchoolDMG(SpellEffectIndex eff_idx)
                         // this shared spell ID are left alone.
                         // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL with spellLevel 20, which at this
                         // level range inflates the roll far beyond what a regular (non-elite) trash mob should deal
-                        if (m_caster->GetEntry() == 21060)
-                            damage = urand(400, 700);
+                        // Retired 2026-08-14: within ~1% of the generic (open-world) formula, see OO/Changes.md.
+                        // if (m_caster->GetEntry() == 21060)
+                        //     damage = urand(400, 700);
                         break;
                     }
                     case 20823:                             // Fireball - extremely widely shared generic template (26+ unrelated casters, all level ranges)
@@ -491,9 +521,10 @@ void Spell::EffectSchoolDMG(SpellEffectIndex eff_idx)
                         // only override for Sunfury Arch Mage (Netherstorm, non-elite, level 68); other casters
                         // of this shared spell ID are left alone.
                         // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL with spellLevel 20, which at level
-                        // 68 inflates the roll far beyond what a regular (non-elite) trash mob should deal
-                        if (m_caster->GetEntry() == 20135)
-                            damage = urand(400, 700);
+                        // 68 inflates the roll far beyond what a regular (non-elite) trash mob should deal.
+                        // Retired 2026-08-14: within ~1% of the generic (open-world) formula, see OO/Changes.md.
+                        // if (m_caster->GetEntry() == 20135)
+                        //     damage = urand(400, 700);
                         break;
                     }
                     case 36534:                             // Energy Surge - the actual damage dealer triggered every 4 sec by spell
@@ -503,10 +534,57 @@ void Spell::EffectSchoolDMG(SpellEffectIndex eff_idx)
                         // only override for Bash'ir Arcanist (Blade's Edge Mountains, non-elite, level 71-72);
                         // Ethereum Researcher (69-70) and Razaani Spell-Thief (67-68) also cast this shared spell
                         // ID but haven't been reported/researched yet, so they're deliberately left untouched.
-                        // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL with spellLevel 20, which at this
-                        // level range inflates the roll far beyond what a regular (non-elite) trash mob should deal
-                        if (m_caster->GetEntry() == 22243)
-                            damage = urand(400, 700);
+                        // Retired 2026-08-14: user chose to trust the generic (open-world) formula despite the
+                        // ~34% gap found earlier (formula ≈832 vs manual 400-700) - see OO/Changes.md.
+                        // if (m_caster->GetEntry() == 22243)
+                        //     damage = urand(400, 700);
+                        break;
+                    }
+                    case 15254:                             // Arcane Bolt - Ethereal Beacon (heroic Mana-Tombs, not shared)
+                    {
+                        // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL with spellLevel 20, which inflates
+                        // the roll far beyond intended. Reference: Schaka/TBC-research issue #15
+                        // ("Mana Tombs Heroic pre-nerf") lists Ethereal Beacon Arcane Bolt at 1675-2225 (Bestiary source).
+                        // Retired 2026-08-14: within ~6% of the generic dungeon-tier formula, see OO/Changes.md.
+                        // damage = urand(1675, 2225);
+                        break;
+                    }
+                    case 12739:                             // Shadow Bolt (heroic) - shared template used by ~10 unrelated casters
+                    {
+                        // only override for Coilfang Leper (heroic Steamvault, entry 21338); other casters left alone.
+                        // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL. Reference: Schaka/TBC-research issue #9
+                        // ("Steamvault Heroic pre-nerf") lists Coilfang Leper Shadow Bolt at 1150-1540.
+                        // Retired 2026-08-14: within ~1% of the generic dungeon-tier formula, see OO/Changes.md.
+                        // Other (untouched) casters of this shared ID now also get a reasonable value for free.
+                        // if (m_caster->GetEntry() == 21338)
+                        //     damage = urand(1150, 1540);
+                        break;
+                    }
+                    case 14145:                             // Fire Blast (heroic) - shared template used by ~14 unrelated casters
+                    {
+                        // only override for Coilfang Leper (heroic Steamvault, entry 21338); other casters left alone.
+                        // Reference: Schaka/TBC-research issue #9 lists Coilfang Leper Fire Blast at 1990-2200.
+                        // Retired 2026-08-14: within ~3% of the generic dungeon-tier formula, see OO/Changes.md.
+                        // if (m_caster->GetEntry() == 21338)
+                        //     damage = urand(1990, 2200);
+                        break;
+                    }
+                    case 15063:                             // Frost Nova (heroic) - shared template used by ~6 unrelated casters
+                    {
+                        // only override for Coilfang Leper (heroic Steamvault, entry 21338); other casters left alone.
+                        // Reference: Schaka/TBC-research issue #9 lists Coilfang Leper Frost Nova at 500-570.
+                        // Retired 2026-08-14: within ~1% of the generic dungeon-tier formula, see OO/Changes.md.
+                        // if (m_caster->GetEntry() == 21338)
+                        //     damage = urand(500, 570);
+                        break;
+                    }
+                    case 16100:                             // Shoot (heroic) - shared template used by ~14 unrelated casters
+                    {
+                        // only override for Coilfang Leper (heroic Steamvault, entry 21338); other casters left alone.
+                        // Reference: Schaka/TBC-research issue #9 lists Coilfang Leper ranged damage at 1280-1650.
+                        // Retired 2026-08-14: within ~3% of the generic dungeon-tier formula, see OO/Changes.md.
+                        // if (m_caster->GetEntry() == 21338)
+                        //     damage = urand(1280, 1650);
                         break;
                     }
                     // Lightning Strike
@@ -549,6 +627,94 @@ void Spell::EffectSchoolDMG(SpellEffectIndex eff_idx)
                     {
                         if (Aura* aura = m_caster->GetAura(43648, EFFECT_INDEX_1))
                             damage *= aura->GetAuraTicks();
+                        break;
+                    }
+                    case 15232:                             // Shadow Bolt - shared template used by ~15 unrelated casters
+                    {
+                        // only override for Bleeding Hollow Scryer (heroic Hellfire Ramparts, entry 18050); other casters left alone.
+                        // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL. Reference: Schaka/TBC-research issue #1
+                        // ("Hellfire Ramparts Heroic pre-nerf") lists Bleeding Hollow Scryer Shadow Bolt at 1750-2350.
+                        // Retired 2026-08-14: within ~0.3% of the generic dungeon-tier formula, see OO/Changes.md.
+                        // if (m_caster->GetEntry() == 18050)
+                        //     damage = urand(1750, 2350);
+                        break;
+                    }
+                    case 17290:                             // Fireball - shared template used by ~7 unrelated casters
+                    {
+                        // Hellfire Imp (heroic Blood Furnace, entry 18606) and Shadowmoon Summoner (same dungeon,
+                        // entry 18617) shared this range - Shadowmoon Summoner was originally given a lower
+                        // open-world-elite-tier value on "same Rank=1 elite as Illidari Highlord" reasoning, but
+                        // stat-driven review (2026-08-14) showed both casters land on essentially the same formula-
+                        // predicted-times-dungeon-multiplier number anyway (raw base points are identical for both),
+                        // which also happens to match Hellfire Imp's real reference value almost exactly.
+                        // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL. Reference: Schaka/TBC-research issue #2
+                        // ("Blood Furnace Heroic pre-nerf", Educated Guess) lists Hellfire Imp Fireball at 2250-3050.
+                        // Retired 2026-08-14: within ~2% of the generic dungeon-tier formula, see OO/Changes.md.
+                        // if (m_caster->GetEntry() == 18606 || m_caster->GetEntry() == 18617)
+                        //     damage = urand(2250, 3050);
+                        break;
+                    }
+                    case 15472:                             // Shadow Bolt - shared template used by other unrelated casters
+                    {
+                        // only override for Shadowmoon Warlock (heroic Blood Furnace, entry 18619); other casters left alone.
+                        // Was reclassified 2026-08-14 to the dungeon-tier formula estimate (2325-3150), then retired
+                        // the same day once the dungeon correction was folded into the generic formula - this
+                        // override existed only to reproduce that exact calculation by hand. No external reference.
+                        // if (m_caster->GetEntry() == 18619)
+                        //     damage = urand(2325, 3150);
+                        break;
+                    }
+                    case 36807:                             // Scorch - shared template used by a few other heroic casters
+                    {
+                        // only override for Bleeding Hollow Darkcaster (heroic Hellfire Ramparts, entry 18049); other casters left alone.
+                        // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL. Reference: Schaka/TBC-research issue #1
+                        // ("Hellfire Ramparts Heroic pre-nerf") lists Bleeding Hollow Darkcaster Scorch at 1600-2150.
+                        // Retired 2026-08-14: was the one outlier in the dungeon-tier stats (formula undershot by
+                        // ~28% at the 1.65 coefficient); after the coefficient was bumped to 1.75 the gap narrowed
+                        // to ~3%, judged close enough to retire like the rest - see OO/Changes.md.
+                        // if (m_caster->GetEntry() == 18049)
+                        //     damage = urand(1600, 2150);
+                        break;
+                    }
+                    case 14034:                             // Fireball - shared template used by many unrelated casters
+                    {
+                        // only override for Hellfire Familiar (heroic Blood Furnace, entry 21646); other casters left alone.
+                        // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL. Reference: Schaka/TBC-research issue #2
+                        // ("Blood Furnace Heroic pre-nerf", Educated Guess) lists Hellfire Familiar Fireball at 850-1150.
+                        // Retired 2026-08-14: within ~0.2% of the generic dungeon-tier formula, see OO/Changes.md.
+                        // if (m_caster->GetEntry() == 21646)
+                        //     damage = urand(850, 1150);
+                        break;
+                    }
+                    case 37856:                             // Arcane Flare (heroic) - direct-hit component (effect index 1);
+                    {                                        // the DoT tick (effect index 0) is a separate override in Object.cpp
+                        // exclusive to Coilfang Siren (heroic Steamvault, entry 20623). spell carries
+                        // SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL. Reference: Schaka/TBC-research issue #9
+                        // ("Steamvault Heroic pre-nerf") lists Arcane Flare for 1321-1527 leaving DoT ticking 642.
+                        // Retired 2026-08-14: within ~0.5% of the generic dungeon-tier formula, see OO/Changes.md.
+                        // damage = urand(1321, 1527);
+                        break;
+                    }
+                    case 20295:                             // Lightning Bolt - shared with one other unrelated caster
+                    {
+                        // only override for Storming Wind-Ripper (Nagrand, non-elite, level 70-71); other caster left alone.
+                        // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL. No external reference (open-world Nagrand);
+                        // raw base is the same magnitude as Enraged Air Spirit's Chain Lightning (12058, also 400-700),
+                        // so reused the same established open-world-non-elite tier.
+                        // Retired 2026-08-14: within ~4% of the generic (open-world) formula, one of the few
+                        // open-world entries close enough to trust - see OO/Changes.md.
+                        // if (m_caster->GetEntry() == 22310)
+                        //     damage = urand(400, 700);
+                        break;
+                    }
+                    case 34425:                             // Water Bolt - shared with one other unrelated caster
+                    {
+                        // only override for Crashing Wave-Spirit (Nagrand, non-elite, level 70-71); other caster left alone.
+                        // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL. No external reference (open-world Nagrand).
+                        // Retired 2026-08-14: user chose to trust the generic (open-world) formula despite the
+                        // ~71% gap found earlier (formula ≈322 vs manual 400-700) - see OO/Changes.md.
+                        // if (m_caster->GetEntry() == 22309)
+                        //     damage = urand(400, 700);
                         break;
                     }
                 }

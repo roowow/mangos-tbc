@@ -3171,25 +3171,100 @@ int32 WorldObject::CalculateSpellEffectValue(Unit const* target, SpellEntry cons
         if (damage)
         {
             CreatureInfo const* cInfo = static_cast<Creature const*>(unitCaster)->GetCreatureInfo();
-            CreatureClassLvlStats const* casterCLS = sObjectMgr.GetCreatureClassLvlStats(unitCaster->GetLevel(), cInfo->UnitClass, cInfo->Expansion);
-            CreatureClassLvlStats const* spellCLS = sObjectMgr.GetCreatureClassLvlStats(spellProto->spellLevel, cInfo->UnitClass, cInfo->Expansion);
-            if (casterCLS && spellCLS)
+            // SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL is used broadly, including by spells whose
+            // spellLevel is intentionally close to the caster's actual level (correctly designed,
+            // not affected by the bug below). Only the ones with a large level gap - spellLevel far
+            // below the caster's actual level - hit the broken curve; this is the exact same
+            // levelGap>=30 threshold used to originally identify the 204-spell affected list (see
+            // the systemic-discovery SQL in OO/Changes.md). Below that gap, fall through to the
+            // original (untouched) formula so already-correct spells are never touched.
+            int32 levelGap = int32(unitCaster->GetLevel()) - int32(spellProto->spellLevel);
+            if (levelGap >= 30)
             {
-                float CLSPowerCreature = casterCLS->BaseDamage;
-                float CLSPowerSpell = spellCLS->BaseDamage;
-                value = value * (CLSPowerCreature / CLSPowerSpell);
+                // Use vanilla (Expansion 0) CLS values instead of the caster's actual expansion track:
+                // the TBC-track (Exp1) data became far too steep after a later CLS table rework, causing
+                // wild overscaling (e.g. ~21.6x at level 70 vs a spellLevel-20 template, instead of the
+                // ~5.45x the vanilla curve gives). See formula analysis in OO/Changes.md (2026-08-13).
+                CreatureClassLvlStats const* casterCLS = sObjectMgr.GetCreatureClassLvlStats(unitCaster->GetLevel(), cInfo->UnitClass, 0);
+                CreatureClassLvlStats const* spellCLS = sObjectMgr.GetCreatureClassLvlStats(spellProto->spellLevel, cInfo->UnitClass, 0);
+                if (casterCLS && spellCLS)
+                {
+                    float ratio = casterCLS->BaseDamage / spellCLS->BaseDamage;
+                    // Dungeon correction: across 17 manually-verified data points (both normal and heroic
+                    // 5-man instances), the vanilla-curve formula alone still undershoots. The raw stats
+                    // actually put normal slightly higher than heroic (means 1.71 vs 1.64, n=4 vs n=13,
+                    // within small-sample noise of each other), but by deliberate choice (2026-08-14) heroic
+                    // is given the higher of the two (1.75) and normal the more conservative original mean
+                    // (1.65), matching the general expectation that heroic hits harder - not something the
+                    // small sample actually proves either way. No correction is applied for raids (zero data
+                    // points so far) or open-world casters (13 data points, too much variance to support a
+                    // correction - see the formula proposal analysis in OO/Changes.md).
+                    Map const* map = unitCaster->GetMap();
+                    if (map && map->IsDungeon() && !map->IsRaid())
+                        ratio *= map->IsRegularDifficulty() ? 1.65f : 1.75f;
+                    value = value * ratio;
+                }
+            }
+            else
+            {
+                // levelGap < 30: not part of the validated bug pattern - keep the original,
+                // untouched formula (caster's own Expansion track, no dungeon correction)
+                CreatureClassLvlStats const* casterCLS = sObjectMgr.GetCreatureClassLvlStats(unitCaster->GetLevel(), cInfo->UnitClass, cInfo->Expansion);
+                CreatureClassLvlStats const* spellCLS = sObjectMgr.GetCreatureClassLvlStats(spellProto->spellLevel, cInfo->UnitClass, cInfo->Expansion);
+                if (casterCLS && spellCLS)
+                    value = value * (casterCLS->BaseDamage / spellCLS->BaseDamage);
             }
         }
 
         // periodic-damage effects don't route through Spell::EffectSchoolDMG, so the
         // SCALES_WITH_CREATURE_LEVEL overrides for them have to live here instead
-        if (effect_index == EFFECT_INDEX_1 && (spellProto->Id == 37272 || spellProto->Id == 37862)) // Poison Bolt DoT - Bog Overlord
-            value = spellProto->Id == 37272 ? float(irand(260, 436)) : float(irand(520, 871));
+        // Poison Bolt DoT - Bog Overlord (37272 normal / 37862 heroic, dungeon). Retired 2026-08-14:
+        // the generic dungeon-tier formula above reproduces this within ~1%, see OO/Changes.md.
+        // if (effect_index == EFFECT_INDEX_1 && (spellProto->Id == 37272 || spellProto->Id == 37862))
+        //     value = spellProto->Id == 37272 ? float(irand(260, 436)) : float(irand(520, 871));
 
         // Rain of Fire - shared template used by several Shadowmoon Valley elites; only override
         // for Makazradon (Legion Hold quest encounter), other casters of this shared spell ID are left alone
         if (effect_index == EFFECT_INDEX_0 && spellProto->Id == 38741 && unitCaster->GetEntry() == 21501)
             value = float(irand(300, 600));
+
+        // Toxic Slime - shared template used by a couple of unrelated casters; only override for
+        // Black Blood of Draenor (Shadowmoon Valley, non-elite, level 70), reference-less estimate
+        // kept modest since it's a non-elite periodic tick, not a single burst hit.
+        // Retired 2026-08-14: user chose to trust the generic (open-world) formula despite the
+        // ~42% gap found earlier (formula ≈158 vs manual 150-300) - see OO/Changes.md.
+        // if (effect_index == EFFECT_INDEX_0 && spellProto->Id == 40818 && unitCaster->GetEntry() == 23286)
+        //     value = float(irand(150, 300));
+
+        // Rain of Fire - exclusive to Bleeding Hollow Darkcaster (heroic Hellfire Ramparts, entry 18049).
+        // Reference: Schaka/TBC-research issue #1 ("Hellfire Ramparts Heroic pre-nerf") lists Rain of Fire at 1460.
+        // Retired 2026-08-14: the generic dungeon-tier formula above reproduces this within ~5%, see OO/Changes.md.
+        // if (effect_index == EFFECT_INDEX_0 && spellProto->Id == 36808 && unitCaster->GetEntry() == 18049)
+        //     value = float(irand(1300, 1600));
+
+        // Aimed Shot - NORMALIZED_WEAPON_DMG effect (adds a flat bonus on top of normal weapon damage,
+        // rather than being the whole hit); only override for Dragonmaw Skybreaker (entries 22274/23440/23441)
+        // and Dragonmaw Transporter (23188) - all Shadowmoon Valley, non-elite, level 70, same UnitClass/Expansion,
+        // so same bug magnitude; other casters of this shared spell ID left alone.
+        // spellLevel is 60 here (not the usual 20), so the bug is less extreme, but still ~3.9x inflated
+        // vs. the intended ~1.2x for this level gap; no external reference, estimated from the formula
+        if (effect_index == EFFECT_INDEX_0 && spellProto->Id == 38861 &&
+                (unitCaster->GetEntry() == 22274 || unitCaster->GetEntry() == 23440 || unitCaster->GetEntry() == 23441 ||
+                 unitCaster->GetEntry() == 23188))
+            value = float(irand(1500, 2000));
+
+        // Corruption DoT - exclusive to Shadowmoon Warlock (heroic Blood Furnace, entry 18619).
+        // Was reclassified 2026-08-14 to the dungeon-tier formula estimate (1000-1180); now retired
+        // entirely the same day once the dungeon correction was folded into the generic formula above
+        // (this override existed only to reproduce that exact calculation by hand). No external reference.
+        // if (effect_index == EFFECT_INDEX_0 && spellProto->Id == 37113 && unitCaster->GetEntry() == 18619)
+        //     value = float(irand(1000, 1180));
+
+        // Arcane Flare (heroic) DoT tick - exclusive to Coilfang Siren (heroic Steamvault, entry 20623).
+        // Reference: Schaka/TBC-research issue #9 ("Steamvault Heroic pre-nerf") lists the DoT ticking 642.
+        // Retired 2026-08-14: the generic dungeon-tier formula above reproduces this within ~0.2%, see OO/Changes.md.
+        // if (effect_index == EFFECT_INDEX_0 && spellProto->Id == 37856 && unitCaster->GetEntry() == 20623)
+        //     value = float(irand(600, 680));
     }
 
     return value;
