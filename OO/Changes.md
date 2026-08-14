@@ -9,7 +9,10 @@
 
 ## Bug 修复记录
 
-### SpellCastArgs 未初始化成员崩溃（2026-08-04）
+### 去除 WorldRunnable 长循环刷屏日志（2026-08-14）
+`WorldRunnable.cpp` 里 `#ifdef MANGOS_DEBUG` 包裹的"Long loop"告警只在Debug构建下打印（正式服确认是Debug构建），单tick超过50ms（`WORLD_SLEEP_CONST`）就刷一条，测得的是整次 `sWorld.Update()` 总耗时，不含子系统细分。用户确认是Debug构建、只想去掉刷屏，不是要立刻排查性能本身。
+修复：删掉该 `sLog.outString` 打印及配套的本地 `overCounter` 计数器，`World::m_worldLoopCounter` 累加逻辑（其他地方还在用，如 `Master.cpp` 的看门狗检测）保留不动。
+**状态**：✅ 代码已改，等待编译部署。性能本身是否需要进一步排查（比如是否该切到Release构建）留待后续。
 生产服崩溃日志定位到 Mana Tombs Pandemonius "Void Blast" 连锁施法：`Spell.h` 的 `SpellCastArgs()` 构造函数漏初始化 `m_itemSet`/`m_itemTarget`，栈垃圾值被误判为"已设置物品目标"，下游解引用野指针崩溃。非 Pandemonius 专属，是通用类缺陷，`mangos-tbc` 同样有此问题，本次只修 `Nmangos-tbc`。
 修复：`Spell.h` 构造函数初始化列表补 `m_itemSet(false), m_itemTarget(nullptr)`。
 **状态**：✅ 代码已改，需重新编译部署。
@@ -398,7 +401,7 @@ if (map && map->IsDungeon() && !map->IsRaid())
 
 | 36 | `e475b84df` | 给 `JudgementGathios` 补上"消耗后移除对应圣印光环"逻辑（读取圣印效果值时一并 `RemoveSpellAuraHolder`），还原"审判消耗圣印"机制 | 单boss单技能，基础脚本(#35)已合并，本条正常应用无冲突 | ✅ 已 cherry-pick（`0653f8639`） |
 
-| 37 | `45fd2be9d` | 海加尔山Anetheron召唤地狱火：进战斗时机从"延迟1.5秒"提前到"召唤瞬间"并锁定AI战斗脚本状态，避免中途脱战判定误删"燃烧"光环；配套DBC给燃烧光环(31304)加脱战不清除属性 | 单boss机制修复，范围窄；DB为 `AttributesServerSide` 位运算UPDATE，非破坏性 | ✅ 已 cherry-pick（`c79ed4921`），`tbcmangosdev` 已执行UPDATE并核实，`tbcmangos2` 待确认 |
+| 37 | `45fd2be9d` | 海加尔山Anetheron召唤地狱火：进战斗时机从"延迟1.5秒"提前到"召唤瞬间"并锁定AI战斗脚本状态，避免中途脱战判定误删"燃烧"光环；配套DBC给燃烧光环(31304)加脱战不清除属性 | 单boss机制修复，范围窄；DB为 `AttributesServerSide` 位运算UPDATE，非破坏性 | ✅ 已 cherry-pick（`c79ed4921`），`tbcmangosdev`+`tbcmangos2` 均已执行UPDATE并核实 |
 
 | — | `c45e4c8a1` | `Unit.cpp` 唯一还在用裸数字0/1索引"攻击强度修正正负号"数组的地方，换成已存在的同名枚举 `AttackPowerModSign::MOD_SIGN_POS/NEG`，数值完全一致 | 纯可读性统一，零行为改变 | ✅ 已 cherry-pick（`3d42d10c7`） |
 
@@ -430,7 +433,7 @@ if (map && map->IsDungeon() && !map->IsRaid())
 
 | — | `5d9039384` | 早前已合并的`aa39545ce`（说话范围按可见距离放大）延伸：那次只覆盖了常规AI喊话函数，`DoScriptText`（DB脚本驱动喊话）走独立函数没覆盖到，这次补齐 | 与已接受逻辑一致，纯客户端体验层 | ✅ 已 cherry-pick（`dc8b1c2fc`） |
 
-| — | `0b83de892` | `[s2491]` 纯改名迁移：`quest_template.ReputationSpilloverMask` → `RewFactionFlags`，配套C++变量/getter同步改名，跟WotLK命名对齐，位掩码语义不变 | 纯改名，零行为改变 | ✅ 已 cherry-pick（`94c492a08`），`tbcmangosdev` 已执行迁移SQL并核实，`tbcmangos2` 待确认 |
+| — | `0b83de892` | `[s2491]` 纯改名迁移：`quest_template.ReputationSpilloverMask` → `RewFactionFlags`，配套C++变量/getter同步改名，跟WotLK命名对齐，位掩码语义不变 | 纯改名，零行为改变 | ✅ 已 cherry-pick（`94c492a08`），`tbcmangosdev` 已执行迁移SQL并核实，`tbcmangos2` **暂缓**——用户需要先更新代码/确认后再同步 |
 
 **⏸️ 本轮逐条审查到此暂停（2026-08-14），已处理到 `0b83de892` 为止。**
 

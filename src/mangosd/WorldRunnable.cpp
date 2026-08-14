@@ -74,7 +74,6 @@ void WorldRunnable::run()
 
     uint32 diffTick = WorldTimer::tick(); // initialize world timer vars
     uint32 diffTime = 0; // used to compute real time elapsed in World::Update()
-    uint32 overCounter = 0; // count overtime loops
 
     ///- While we have not World::m_stopEvent, update the world
     while (!World::IsStopped())
@@ -92,13 +91,6 @@ void WorldRunnable::run()
         {
             MaNGOS::Thread::Sleep(WORLD_SLEEP_CONST - diffTime);
         }
-#ifdef MANGOS_DEBUG
-        else
-        {
-            ++overCounter;
-            sLog.outString("WorldRunnable:run Long loop #%d : %dms (total : %d loop(s), %.3f%%)", World::m_worldLoopCounter, diffTime, overCounter, (float)(100*overCounter) / (float)World::m_worldLoopCounter);
-        }
-#endif
 
 #ifdef _WIN32
         if (m_ServiceStatus == 0)
