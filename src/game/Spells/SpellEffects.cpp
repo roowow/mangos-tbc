@@ -475,6 +475,40 @@ void Spell::EffectSchoolDMG(SpellEffectIndex eff_idx)
                         damage = urand(400, 700);
                         break;
                     }
+                    case 12058:                             // Chain Lightning - shared template used by ~20 unrelated casters across many zones/levels
+                    {
+                        // only override for Enraged Air Spirit (Shadowmoon Valley, non-elite, level 69-70, same
+                        // family as Enraged Fire/Earth Spirit above - reusing the same range); other casters of
+                        // this shared spell ID are left alone.
+                        // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL with spellLevel 20, which at this
+                        // level range inflates the roll far beyond what a regular (non-elite) trash mob should deal
+                        if (m_caster->GetEntry() == 21060)
+                            damage = urand(400, 700);
+                        break;
+                    }
+                    case 20823:                             // Fireball - extremely widely shared generic template (26+ unrelated casters, all level ranges)
+                    {
+                        // only override for Sunfury Arch Mage (Netherstorm, non-elite, level 68); other casters
+                        // of this shared spell ID are left alone.
+                        // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL with spellLevel 20, which at level
+                        // 68 inflates the roll far beyond what a regular (non-elite) trash mob should deal
+                        if (m_caster->GetEntry() == 20135)
+                            damage = urand(400, 700);
+                        break;
+                    }
+                    case 36534:                             // Energy Surge - the actual damage dealer triggered every 4 sec by spell
+                                                              // 36508's PERIODIC_TRIGGER_SPELL aura (36508 itself is unaffected by the
+                                                              // scaling bug - only the triggered spell is); shared by 3 unrelated casters
+                    {
+                        // only override for Bash'ir Arcanist (Blade's Edge Mountains, non-elite, level 71-72);
+                        // Ethereum Researcher (69-70) and Razaani Spell-Thief (67-68) also cast this shared spell
+                        // ID but haven't been reported/researched yet, so they're deliberately left untouched.
+                        // spell carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL with spellLevel 20, which at this
+                        // level range inflates the roll far beyond what a regular (non-elite) trash mob should deal
+                        if (m_caster->GetEntry() == 22243)
+                            damage = urand(400, 700);
+                        break;
+                    }
                     // Lightning Strike
                     case 37841:
                         if (unitTarget->GetTypeId() == TYPEID_PLAYER && unitTarget->HasAura(37830)) // Repolarized Magneto Sphere

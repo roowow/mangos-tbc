@@ -118,6 +118,17 @@ Grandmaster Vorpil 自己的暗影新星（33846）有同样"不分难度"问题
 修复：`SpellEffects.cpp` `EffectSchoolDMG` 里 `case 9613:` 再追加一个entry条件，不改动法术ID/数据库。
 **状态**：✅ 代码已实施，等待编译部署 + 实测反馈。
 
+### 影月谷"愤怒的气灵"闪电链伤害过高（2026-08-13）
+玩家反馈愤怒的气灵（entry 21060，69-70级，`Rank=0`非精英，`UnitClass=2`，map 530）"闪电链" = 法术12058，跟"愤怒的火灵/地灵"是同一家族。法术ID被约20个不同区域的怪共用（Mosh'Ogg萨满、祖尔法拉巫医、Twilight系列等），只判断 `m_caster->GetEntry() == 21060` 才覆盖。同档位沿用 `urand(400,700)`。
+修复：`SpellEffects.cpp` `EffectSchoolDMG` 新增 `case 12058:`，内部判断施法者entry才覆盖，不改动法术ID/数据库。
+**状态**：✅ 代码已实施，等待编译部署 + 实测反馈。
+
+### 刀锋山"巴什伊尔奥术师"+虚空风暴"日怒大法师"伤害过高（2026-08-13）
+1. **巴什伊尔奥术师（22243）"能量涌动"，玩家给的法术是36508，实际要修的是36534**——跟"上古之火"同一种"容器技能"结构：36508是 `PERIODIC_TRIGGER_SPELL`（每4秒触发一次），自己不带缩放bug；真正伤害来自它触发的独立法术36534。该ID还被 Ethereum Researcher（69-70级）、Razaani Spell-Thief（67-68级）共用，均未被反馈过，不动，只判断 `m_caster->GetEntry() == 22243`。71-72级非精英，无外部参考，给 `urand(400,700)`。
+2. **日怒大法师（20135）"火球术" = 法术20823**——目前遇到过共用度最高的之一，26+个不同区域怪共用，只判断entry=20135。68级非精英，同档给 `urand(400,700)`。
+修复：`SpellEffects.cpp` `EffectSchoolDMG` 新增 `case 20823:` 和 `case 36534:`，均带施法者entry判断，不改动法术ID/数据库。
+**状态**：✅ 代码已实施，等待编译部署 + 实测反馈。
+
 ### 影月谷"军团要塞"玛卡扎顿火焰之雨伤害过高（2026-08-12）
 玩家反馈影月谷军团要塞（Legion Hold）任务精英玛卡扎顿（entry 21501，68-69级，`Rank=1`精英，`UnitClass=1`，两个深渊魔王之一，走 `creature_ai_scripts`）"火焰之雨"（法术38741）伤害异常。同一根因（`Attributes` 含 `SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL`，`spellLevel=20`）。
 **这次跟之前几个的关键区别——技能本身就是持续伤害光环，不走 `EffectSchoolDMG`**：`Effect1=27`(PERSIST_AREA_AURA) + `EffectApplyAuraName1=3`(PERIODIC_DAMAGE，每3秒跳一次)，是纯粹的地面持续伤害区域，不是"直接命中"类效果，所以完全不会经过前8次用来修复的 `Spell::EffectSchoolDMG` 函数。**修复位置改在缩放公式本身发生的地方**（`Object.cpp` 的 `CalculateSpellEffectValue`，针对 `spellProto->Id`+`effect_index` 直接覆盖），这也是排查这条时才发现"毒液箭DoT遭漏修"这个问题的契机（见上面订正）。
@@ -169,6 +180,81 @@ WHERE (s.Attributes & 0x80000) != 0
   AND (CAST(ct.MinLevel AS SIGNED) - CAST(s.spellLevel AS SIGNED)) >= 30
 ORDER BY levelGap DESC;
 ```
+
+### 后续进展：发现 origin/master 已有官方的公式级修复（2026-08-13）
+
+**背景**：核对 `v3` 分支相对 `origin`（Nightingale9002/Nmangos-tbc）远程的 `master` 分支（注意不是 `master3`，两者是不同分支）差异，发现 `v3` 已经**真分叉**——领先50个提交（我们自己的cherry-pick+这次会话的一堆技能修复），落后87个提交。逐条审查尚未开始，但其中一条直接命中了上面这个系统性问题：
+
+**`7c72bb407` "修复法系怪伤害异常"（Nightingale9002，2026-08-13）**：改的正是 `CalculateSpellEffectValue` 里那两处 `GetCreatureClassLvlStats` 调用，把查表用的 `Expansion` 参数从怪物自己的实际版本（TBC=1）**无条件改成 0（原版旧世界）**，作者注释："Use vanilla (Expansion 0) CLS values to avoid overscaling spell damage after the s2488 CLS rework"——即某次代号 s2488 的CLS表重做，把TBC档位（Exp1）的曲线数据搞得过陡，这正是我们这批bug背后更深一层的根因（不是公式逻辑错，是数据源本身在某次改动后跟不上）。
+
+**核实数据**（`creature_template_classlevelstats`，UnitClass 1/2/8，几个关键等级点）：
+
+| 等级 | Exp1（TBC档，旧） | Exp0（原版档，新） |
+|---|---|---|
+| 20 | 12.10 | 12.10（一致） |
+| 67 | 173.60 | 62.60 |
+| 70 | 261.32 | 65.99 |
+| 71 | 265.89 | 67.14 |
+
+70级缩放倍数：旧档 261.32/12.10≈**21.6倍**（就是我们一直在手动覆盖的离谱系数）→ 新档 65.99/12.10≈**5.45倍**。且新档在67-71级区间波动很小（5.17-5.55倍），比旧档（14-22倍剧烈波动）稳定得多，佐证"TBC档位"数据本身就是坏的。
+
+**用这19个已修复技能反推验证新公式**：把新公式（Exp0）套到这次会话手动修的全部技能上重算（取等级/原始基数中值估算，仅供量级参考），逐条对照如下：
+
+野外精英/普通怪：
+
+| 技能 | 新公式算出来 | 我们定的值 | 对照 |
+|---|---|---|---|
+| 暗影箭 9613（暗影议会术士等） | ≈388 | 350-600 | ✅ 落在区间内 |
+| 暗影箭 20298（斯克提斯唤魂者） | ≈534 | 500-800 | ✅ 落在区间内 |
+| 火焰投石 38498（愤怒的地灵） | ≈590 | 400-700 | ✅ 落在区间内 |
+| 上古之火 37988（日蚀法师） | ≈658 | 400-700 | ✅ 接近上限 |
+| 邪能火球 36247/37945 | ≈395 | 400-700 | ✅ 接近下限 |
+| 烈焰风暴 16102（伊利达雷大领主） | ≈1365 | 1500-2200 | ⚠️ 略低于下限 |
+| 奥术箭 13901（斯克提斯风行者） | ≈338 | 500-800 | ⚠️ 偏低 |
+| 水箭 32011（库斯卡海妖） | ≈790 | 400-700 | ⚠️ 偏高 |
+
+副本精英（蒸汽地窖/奴隶围栏，有 Schaka 实测数据支撑）：
+
+| 技能 | 新公式算出来 | 我们定的值 |
+|---|---|---|
+| 冰霜震击 22582（普通） | ≈981 | 1700-2100 |
+| 寒冰箭 12675（普通） | ≈916 | 1290-1760 |
+| 寒冰箭 37930（英雄） | ≈1832 | 2580-3520 |
+| 毒液箭 37272（普通） | ≈818 | 1000-1675 |
+| 毒液箭 37862（英雄） | ≈1636 | 2000-3350 |
+| 闪电箭 15234（普通） | ≈916 | 1200-1750 |
+
+**结论**：
+- **野外精英/普通怪**：新公式结果**普遍落在或接近我们手动定的区间**，互相印证，说明公式修复对这一档基本可以自然给出合理结果。
+- **副本精英**：新公式结果**只有我们参考 `Schaka/TBC-research` 实测数据定的值的一半左右**，说明光靠这条公式修复，副本精英这档还是会明显偏弱，达不到查证到的真实参考数值。
+
+**决策**：
+1. 这19个手动 `case` 覆盖**全部保留**，不受公式修复影响（覆盖机制是直接替换最终值，不管上游公式怎么算）。
+2. 公式修复本身**暂不合并**，先按老办法继续逐个反馈逐个修（尤其副本精英这档，公式不够用，必须靠实测数据）。
+3. 除了 Nightingale9002 的"无条件切换"写法，讨论过一个更保守的替代方案——**只在旧档算出的倍数明显失控（比如>10倍）时才回退查原版档位**，正常场景不受任何影响，风险更小，阈值和10倍这个数字都还需要更多数据点校准，同样先记录、不实施：
+```cpp
+if (damage)
+{
+    CreatureInfo const* cInfo = static_cast<Creature const*>(unitCaster)->GetCreatureInfo();
+    CreatureClassLvlStats const* casterCLS = sObjectMgr.GetCreatureClassLvlStats(unitCaster->GetLevel(), cInfo->UnitClass, cInfo->Expansion);
+    CreatureClassLvlStats const* spellCLS = sObjectMgr.GetCreatureClassLvlStats(spellProto->spellLevel, cInfo->UnitClass, cInfo->Expansion);
+    if (casterCLS && spellCLS)
+    {
+        float ratio = casterCLS->BaseDamage / spellCLS->BaseDamage;
+        if (ratio > 10.0f)  // 倍数失控时才回退到原版曲线，阈值待更多数据校准
+        {
+            CreatureClassLvlStats const* casterCLS0 = sObjectMgr.GetCreatureClassLvlStats(unitCaster->GetLevel(), cInfo->UnitClass, 0);
+            CreatureClassLvlStats const* spellCLS0 = sObjectMgr.GetCreatureClassLvlStats(spellProto->spellLevel, cInfo->UnitClass, 0);
+            if (casterCLS0 && spellCLS0)
+                ratio = casterCLS0->BaseDamage / spellCLS0->BaseDamage;
+        }
+        value = value * ratio;
+    }
+}
+```
+4. **暂不合并的风险提示**：`origin/master` 上这条修复之外还有86个未审查的提交，`v3` 相对它是真分叉（领先50/落后87），不是简单落后，以后要合并需要处理冲突，不是纯 fast-forward。
+
+**状态**：⏸️ 暂缓，继续逐个修复反馈到的技能，积累更多副本/区域的数据点后再回头决定公式修复的合并方式（无条件切换 / 阈值回退 / 继续纯手动）。
 
 ---
 
