@@ -2151,6 +2151,31 @@ void World::ShutdownServ(uint32 time, uint32 options, uint8 exitcode)
     }
 }
 
+// Chinese-localized equivalent of secsToTimeString(), used only for the shutdown/restart
+// countdown broadcast so the "[服务器] 即将重启/关闭，剩余时间" client string (already
+// Chinese) isn't followed by an English "X Minute(s) Y Second(s)." remainder. Kept local to
+// this call site rather than changing secsToTimeString() itself, which is shared by many
+// unrelated GM-command/console-facing callers (bans, cooldown/respawn timers, etc.).
+static std::string ShutdownTimeStringCN(time_t timeInSecs)
+{
+    time_t secs    = timeInSecs % MINUTE;
+    time_t minutes = timeInSecs % HOUR / MINUTE;
+    time_t hours   = timeInSecs % DAY  / HOUR;
+    time_t days    = timeInSecs / DAY;
+
+    std::ostringstream ss;
+    if (days)
+        ss << days << "天";
+    if (hours)
+        ss << hours << "小时";
+    if (minutes)
+        ss << minutes << "分钟";
+    if (secs || (!days && !hours && !minutes))
+        ss << secs << "秒";
+
+    return ss.str();
+}
+
 /// Display a shutdown message to the user(s)
 void World::ShutdownMsg(bool show /*= false*/, Player* player /*= nullptr*/)
 {
@@ -2167,7 +2192,7 @@ void World::ShutdownMsg(bool show /*= false*/, Player* player /*= nullptr*/)
             (m_ShutdownTimer < 12 * HOUR && (m_ShutdownTimer % HOUR) == 0) ||           // < 12 h; every 1 h
             (m_ShutdownTimer >= 12 * HOUR && (m_ShutdownTimer % (12 * HOUR)) == 0))     // >= 12 h; every 12 h
     {
-        std::string str = secsToTimeString(m_ShutdownTimer);
+        std::string str = ShutdownTimeStringCN(m_ShutdownTimer);
 
         ServerMessageType msgid = (m_ShutdownMask & SHUTDOWN_MASK_RESTART) ? SERVER_MSG_RESTART_TIME : SERVER_MSG_SHUTDOWN_TIME;
 

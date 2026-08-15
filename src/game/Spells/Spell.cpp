@@ -1495,6 +1495,19 @@ void Spell::DoSpellHitOnUnit(Unit* unit, uint32 effectMask, TargetInfo* target, 
             int32 duration = m_spellAuraHolder->GetAuraMaxDuration();
             int32 originalDuration = duration;
 
+            // SpellAuraHolder recomputes its own duration independently in its constructor and never
+            // consults target->effectDuration (the mechanic-duration-mod result from
+            // Unit::CalculateAuraDuration() in AddUnitTarget(), e.g. Weapon Mastery vs. disarm) unless
+            // diminishing returns also happens to apply below. Scoped to disarm for now, same as the
+            // AddUnitTarget() fix - see OO/Changes.md.
+            if (duration > 0 && target->effectDuration >= 0 && target->effectDuration < duration &&
+                (GetSpellMechanicMask(m_spellInfo, effectMask) & convertEnumToFlag(MECHANIC_DISARM)))
+                duration = target->effectDuration;
+
+            if (m_spellInfo->Id == 36207 || m_spellInfo->Id == 36208)
+                sLog.outString("[DISARM DEBUG] DoSpellHitOnUnit spell %u on %s: holderMaxDuration=%dms target->effectDuration=%dms duration-after-mechanic-fix=%dms",
+                                m_spellInfo->Id, unit->GetGuidStr().c_str(), originalDuration, target->effectDuration, duration);
+
             if (duration > 0 && target->diminishGroup > DIMINISHING_NONE)
             {
                 duration = target->diminishDuration;
