@@ -950,6 +950,10 @@ void Spell::AddUnitTarget(Unit* target, uint8 effectMask, CheckException excepti
     // Calculate hit result
     targetInfo.missCondition = m_ignoreHitResult ? SPELL_MISS_NONE : Unit::SpellHitResult(m_trueCaster, target, m_spellInfo, targetInfo.effectMask, m_reflectable, false, &targetInfo.heartbeatResistChance);
 
+    if (m_spellInfo->Id == 36207 || m_spellInfo->Id == 36208)
+        sLog.outString("[DISARM DEBUG] AddUnitTarget spell %u target %s: effectMask=%u notImmunedMask=%u effectHitMask=%u missCondition=%u",
+                        m_spellInfo->Id, target->GetGuidStr().c_str(), effectMask, notImmunedMask, targetInfo.effectHitMask, targetInfo.missCondition);
+
     if ((executionlessMask & targetInfo.effectMask) != 0)
     {
         targetInfo.effectMask &= ~executionlessMask;
@@ -1039,7 +1043,11 @@ void Spell::AddUnitTarget(Unit* target, uint8 effectMask, CheckException excepti
     {
         bool isReflected = targetInfo.missCondition == SPELL_MISS_REFLECT && targetInfo.reflectResult == SPELL_MISS_NONE;
         Unit* targetForDiminish = isReflected ? m_caster : target;
-        if (IsAuraApplyEffects(m_spellInfo, SpellEffectIndexMask(targetInfo.effectHitMask)))
+        bool hasAuraApplyEffects = IsAuraApplyEffects(m_spellInfo, SpellEffectIndexMask(targetInfo.effectHitMask));
+        if (m_spellInfo->Id == 36207 || m_spellInfo->Id == 36208)
+            sLog.outString("[DISARM DEBUG] DR-gate spell %u target %s: effectHitMask=%u hasAuraApplyEffects=%d incomingDuration=%dms",
+                            m_spellInfo->Id, target->GetGuidStr().c_str(), targetInfo.effectHitMask, hasAuraApplyEffects, targetInfo.effectDuration);
+        if (hasAuraApplyEffects)
             targetInfo.effectDuration = targetForDiminish->CalculateAuraDuration(m_spellInfo, effectMask, targetInfo.effectDuration, realCaster);
         if ((targetInfo.missCondition == SPELL_MISS_NONE || isReflected) && CanSpellDiminish())
         {
