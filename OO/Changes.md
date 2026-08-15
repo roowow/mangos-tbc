@@ -1,3 +1,8 @@
+70测试服数据库 cmangos
+WorldDatabase.Info          = "s1.oowow.world;3446;cmangos; cManGos2025;tbcmangosdev"
+CharactersDatabase.Info     = "s1.oowow.world;3446;cmangos; cManGos2025 tbccharactersdev"
+C:\Program Files\MySQL\MySQL Server 8.4\bin
+
 # 测试库基准线变更记录
 
 记录以 `tbcmangosdev`（测试库）为基准建立新基准线过程中，从各数据源同步过去的数据变更，以及后续 bug 修复、upstream 合并记录。跟 `fix.sql`（单条内容/bug修复）分开记录。
@@ -392,7 +397,7 @@ if (map && map->IsDungeon() && !map->IsRaid())
 | 29 | `d48be200e` | 卡拉赞策展者(Curator)"星界耀斑"召唤物追击玩家的仇恨值，`100001.f` → `1000.f` | 单行改动，改动范围极窄（只影响这一个boss召唤物的仇恨机制），具体原始bug表现未完全查证到根源，但爆炸半径小 | ✅ 已 cherry-pick（`b06b4d4f2`） |
 | 30 | `43162a9da` | `Spell::EffectPowerBurn` 删除一行人为拼凑的战斗日志（原注释自述"客户端没实现POWER_BURN显示"的workaround），作者基于抓包证据确认真实协议不发这条日志 | 纯删除，不影响实际伤害/效果，只影响法力灼烧类法术的战斗记录显示细节 | ✅ 已 cherry-pick（`1f9c81b0d`） |
 | 31 | `c55d84514` | 黑色圣殿"遗物之魂"boss战"灵魂尖啸"(41545)命中后清空目标怒气，作者自述是"hack"（伤害结算与怒气生成顺序问题的临时补丁），需要配套SQL新增 `spell_scripts` 绑定 | 范围极窄（单boss单技能），作者自认是workaround非通用修复 | ⏸️ 用户选择暂不合并 |
-| 32 | `3098491fd` | 新增 `SendMessageToAllWhoSeeMeMove` 替换7处移动广播调用点，修正被魅惑/操控生物移动时会把移动包"回声"给操控者自己客户端（旧函数的 `self` 参数被基类忽略），造成画面抖动/回弹 | 核心移动广播路径，但新增辅助函数+替换调用，旧函数不删除不影响其他调用方；只在魅惑/操控场景有实际行为差异 | ✅ 已 cherry-pick（`1076c2cd8`） |
+| 32 | `3098491fd` | 新增 `SendMessageToAllWhoSeeMeMove` 替换7处移动广播调用点，修正被魅惑/操控生物移动时会把移动包"回声"给操控者自己客户端（旧函数的 `self` 参数被基类忽略），造成画面抖动/回弹 | 核心移动广播路径，但新增辅助函数+替换调用，旧函数不删除不影响其他调用方；只在魅惑/操控场景有实际行为差异 | ❌ 已 cherry-pick（`1076c2cd8`）后引发线上回归，已于 2026-08-15 整体 `git revert`（见下方事故记录） |
 | 33 | `ad18b2013` | 黑色圣殿泰隆·尸风(Teron Gorefiend)boss战3个法术脚本结构体补充法术名/ID注释 | 纯注释，零逻辑改动 | ✅ 已 cherry-pick（`500627de5`） |
 
 | 34 | `264805cef` | 海加尔山刷波逻辑：`SetVariable(...,enemyCount-1)` 没有同步递减本地变量，导致本波最后一个敌人死亡时"是否清空/该刷下一波"判断误判 | 单行改动，逻辑bug清晰，只影响这一个团队本的刷波机制 | ✅ 已 cherry-pick（`b03bca3ed`） |
@@ -433,7 +438,7 @@ if (map && map->IsDungeon() && !map->IsRaid())
 
 | — | `5d9039384` | 早前已合并的`aa39545ce`（说话范围按可见距离放大）延伸：那次只覆盖了常规AI喊话函数，`DoScriptText`（DB脚本驱动喊话）走独立函数没覆盖到，这次补齐 | 与已接受逻辑一致，纯客户端体验层 | ✅ 已 cherry-pick（`dc8b1c2fc`） |
 
-| — | `0b83de892` | `[s2491]` 纯改名迁移：`quest_template.ReputationSpilloverMask` → `RewFactionFlags`，配套C++变量/getter同步改名，跟WotLK命名对齐，位掩码语义不变 | 纯改名，零行为改变 | ✅ 已 cherry-pick（`94c492a08`），`tbcmangosdev` 已执行迁移SQL并核实，`tbcmangos2` **暂缓**——用户需要先更新代码/确认后再同步 |
+| — | `0b83de892` | `[s2491]` 纯改名迁移：`quest_template.ReputationSpilloverMask` → `RewFactionFlags`，配套C++变量/getter同步改名，跟WotLK命名对齐，位掩码语义不变 | 纯改名，零行为改变 | ✅ 已 cherry-pick（`94c492a08`），`tbcmangosdev`+`tbcmangos2` 均已执行迁移SQL并核实 |
 
 **⏸️ 本轮逐条审查到此暂停（2026-08-14），已处理到 `0b83de892` 为止。**
 
@@ -448,5 +453,15 @@ if (map && map->IsDungeon() && !map->IsRaid())
 修复文件：`src/game/Server/WorldSession.cpp`、`src/game/Server/WorldSession.h`、`src/shared/Network/AsyncListener.hpp`。
 
 **状态**：✅ 代码已改，等待用户重新编译验证。仍建议全量重新编译一遍，确认没有其他未发现的类似问题（本轮cherry-pick没有做过实际编译验证，不能保证这是唯一一处）。
+
+### ⚠️ 线上回归：`3098491fd` 导致飞行路径卡死，已整体 revert（2026-08-15，玩家反馈发现）
+
+**现象**（玩家反馈原文）：点飞行管理员后没有报错、也不出现起飞动画，角色停在原地不动；但等到原本飞行应该耗费的时间过去后，角色直接出现在了目的地。
+
+**根因**：`3098491fd`（cherry-pick为`1076c2cd8`）新增的 `Unit::SendMessageToAllWhoSeeMeMove()` 替换了 `MoveSplineInit.cpp` 里飞行路径/服务端强制样条移动的两处广播调用。旧函数 `Player::SendMessageToAllWhoSeeMe(data, self=true)` 在 `self=true` 时会无条件直接给自己的客户端发一份移动包，不依赖"自己是否已经在自己的可见者列表(`clientGuidsIAmAt`)里"；新函数完全没有这个兜底，只广播给 `clientGuidsIAmAt` 里已登记的对象，一旦飞行开始那一刻自己的guid还没登记进去，玩家客户端就永远收不到"开始飞行"这个包——但服务端的样条移动计时器仍然按时跑完并把玩家挪到终点，于是出现"客户端没动画、卡在原地，时间到了却传送到了目的地"的现象。
+
+**处理方式**：讨论过"只在 `SendMessageToAllWhoSeeMeMove` 里补一个兜底"的最小改法，但该commit本身还捆绑了`MovementHandler.cpp`4处ack回显去重（charm/possess操控生物移动时给自己回显重复移动包的老问题），补丁式修复会让代码状态偏离"这个commit到底做没做"的清晰判断。最终选择**整体 `git revert`**，干净回到该commit之前的状态：新提交 `e3dc1ea3e`，5个文件（`Object.h`/`Unit.h`/`Unit.cpp`/`MovementHandler.cpp`/`MoveSplineInit.cpp`）全部撤销。副作用：charm/possess回显重复移动包的老问题会重新出现，但只在魅惑/操控场景触发，非阻断性瑕疵，优先级远低于"飞行卡死"这个玩法性bug。
+
+**状态**：✅ 已在本地revert提交（`e3dc1ea3e`），待部署验证。
 
 **待办**：下次继续时先处理 `ff9de1d6e` 的决定，再用 `git log --reverse --oneline --cherry-pick --right-only v3...origin/master` 查出后续，继续逐条审查。
