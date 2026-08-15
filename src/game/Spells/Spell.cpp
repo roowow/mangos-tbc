@@ -1043,7 +1043,13 @@ void Spell::AddUnitTarget(Unit* target, uint8 effectMask, CheckException excepti
     {
         bool isReflected = targetInfo.missCondition == SPELL_MISS_REFLECT && targetInfo.reflectResult == SPELL_MISS_NONE;
         Unit* targetForDiminish = isReflected ? m_caster : target;
+        // IsAuraApplyEffects() wrongly requires *every* hit effect to be an aura-apply effect, so a spell
+        // that bundles a disarm aura with a non-aura effect (e.g. 36208 Steal Weapon) never reaches
+        // CalculateAuraDuration() and skips mechanic-duration-mod talents like Weapon Mastery. Scoped the
+        // fix to disarm specifically for now rather than widening it to every mechanic - see OO/Changes.md.
         bool hasAuraApplyEffects = IsAuraApplyEffects(m_spellInfo, SpellEffectIndexMask(targetInfo.effectHitMask));
+        if (!hasAuraApplyEffects && (GetSpellMechanicMask(m_spellInfo, targetInfo.effectHitMask) & convertEnumToFlag(MECHANIC_DISARM)))
+            hasAuraApplyEffects = HasAnyAuraApplyEffect(m_spellInfo, SpellEffectIndexMask(targetInfo.effectHitMask));
         if (m_spellInfo->Id == 36207 || m_spellInfo->Id == 36208)
             sLog.outString("[DISARM DEBUG] DR-gate spell %u target %s: effectHitMask=%u hasAuraApplyEffects=%d incomingDuration=%dms",
                             m_spellInfo->Id, target->GetGuidStr().c_str(), targetInfo.effectHitMask, hasAuraApplyEffects, targetInfo.effectDuration);

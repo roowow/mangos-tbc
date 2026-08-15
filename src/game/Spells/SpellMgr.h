@@ -111,6 +111,25 @@ inline bool IsAuraApplyEffects(SpellEntry const* entry, SpellEffectIndexMask mas
     return !empty;
 }
 
+// Unlike IsAuraApplyEffects() above (which requires *every* queried effect to be an
+// aura-apply effect, and is kept as-is for its existing caller), this returns true as
+// soon as *any* queried effect is an aura-apply effect. Needed for spells that mix an
+// aura effect with a non-aura effect (e.g. a script effect) on the same target - such a
+// spell still needs its aura duration run through mechanic-duration-mod talents (e.g.
+// Weapon Mastery vs. a disarm bundled with a script effect, see spell 36208).
+inline bool HasAnyAuraApplyEffect(SpellEntry const* entry, SpellEffectIndexMask mask)
+{
+    if (!entry)
+        return false;
+    for (uint32 i = EFFECT_INDEX_0; i < MAX_EFFECT_INDEX; ++i)
+    {
+        const uint32 current = (1 << i);
+        if ((mask & current) && entry->Effect[i] && IsAuraApplyEffect(entry, SpellEffectIndex(i)))
+            return true;
+    }
+    return false;
+}
+
 inline bool IsSpellAppliesAura(SpellEntry const* spellInfo, uint32 effectMask = ((1 << EFFECT_INDEX_0) | (1 << EFFECT_INDEX_1) | (1 << EFFECT_INDEX_2)))
 {
     for (uint32 i = 0; i < MAX_EFFECT_INDEX; ++i)

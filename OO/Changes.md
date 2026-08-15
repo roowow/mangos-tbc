@@ -466,6 +466,26 @@ if (map && map->IsDungeon() && !map->IsRaid())
 
 **状态**：✅ 已通过干净编译复测确认，`v3`当前状态（含revert `e3dc1ea3e`）飞行功能正常，症状1解决。
 
-**状态**：✅ 已在本地revert提交（`e3dc1ea3e`），待部署验证。
+### 玩法反馈：H鲜血熔炉甘尔葛机械师"窃取武器"缴械未受武器掌握减免（2026-08-15，玩家反馈+日志实锤）
+
+**现象**（玩家反馈原文）：战士狂暴天赋"武器掌握"(20505，缴械机制持续时间-51%)理论上应该让被甘尔葛机械师(16949)"窃取武器"缴械的时间减半，实测缴械依旧是6秒，减免没有生效。
+
+**排查过程**：先核对了DB配置（技能`36208`的`Mechanic=3`即缴械、武器掌握`20505`的`SPELL_AURA_MECHANIC_DURATION_MOD_NOT_STACK`效果misc值也是缴械，配置本身没问题），怀疑是引擎判定逻辑的问题，于是在`Unit::CalculateAuraDuration`（减免实际生效的地方）、`Spell.cpp:AddUnitTarget`（命中判定）、`Spell.cpp`里调用`CalculateAuraDuration`前的判定开关、`Aura::HandleAuraModDisarm`（缴械光环实际生效的地方）四处加了临时调试日志，让玩家现场测试并抓日志比对。
+
+日志显示：36208命中判定完全正常（`effectHitMask=3`，两个效果都命中，没有被抗性/免疫拦掉），缴械光环也确实正常挂到了玩家身上（`HandleAuraModDisarm apply=1 duration=6000ms`，6秒后正常消失），**但`CalculateAuraDuration`这个减免逻辑所在的函数，对36208这个技能全程没有被调用过一次**——问题就出在调用它之前的开关判断上。
+
+**根因**：`SpellMgr.h`里的`IsAuraApplyEffects()`判断逻辑写反了——现在的逻辑是"这次命中的所有效果**必须全部**是光环类效果才返回true"，只要命中效果里混了一个非光环类效果就直接返回false。而36208（"窃取武器"）的实现比较特殊：效果1是脚本效果(`SPELL_EFFECT_SCRIPT_EFFECT`，让玩家反过来对NPC施放另一个技能36207，做"NPC抢到武器"的视觉效果)，效果2才是真正的缴械光环——一个非光环效果混进来，直接让整个判断失败，`CalculateAuraDuration`被跳过，缴械光环最终用的是完全没打折的原始6秒。
+
+这不是DB数据问题，是引擎里一个通用判断函数的逻辑bug；查了一下DB，全库有2306条技能存在"光环效果+非光环效果混合"的模式，理论上都会经过这个错误判断，但实际会表现出肉眼可见差异的，需要同时满足"光环和非光环效果打在同一目标"+"目标身上有对应机制减免/弹射判定在生效"，范围小得多，目前实锤的只有这一例。
+
+**处理方式**：用户明确要求限定影响范围、暂不做全局修复，等后续观察是否有其他同类反馈再决定要不要推广。最终方案：
+- 保留原有`IsAuraApplyEffects()`函数完全不动（`Spell.cpp:5329`光环弹射逻辑那处调用不受任何影响）
+- 新增一个`HasAnyAuraApplyEffect()`函数（正确的"只要有一个是光环效果就算数"逻辑），只在`Spell.cpp:1046`附近`CalculateAuraDuration`调用前的开关处，**且仅当命中效果的机制掩码包含`MECHANIC_DISARM`(缴械)时**才启用这个修正判断，其他机制（眩晕/减速/沉默等）继续走原来的（有bug的）判断，行为不变
+
+修改文件：`src/game/Spells/SpellMgr.h`（新增函数）、`src/game/Spells/Spell.cpp`（缴械机制专属的开关判断）。
+
+**待办**：临时调试日志（`[DISARM DEBUG]`，分布在`Unit.cpp`/`SpellAuras.cpp`/`Spell.cpp`）还没清理，等修复效果编译部署验证通过后一并删除。如果后续还有其他"机制减免类天赋没生效"的类似反馈，再考虑把`IsAuraApplyEffects()`的判断逻辑做成全局修复（`ANY`而非`ALL`），而不是每个机制单独开口子。
+
+**状态**：⏳ 代码已改（范围限定为缴械机制），等待编译部署+日志复测确认。
 
 **待办**：下次继续时先处理 `ff9de1d6e` 的决定，再用 `git log --reverse --oneline --cherry-pick --right-only v3...origin/master` 查出后续，继续逐条审查。
