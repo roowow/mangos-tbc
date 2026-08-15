@@ -28,6 +28,7 @@ CMANGOS_DIR="/home/rogical/cmangos"
 MANGOS_TBC_DIR="$CMANGOS_DIR/mangos-tbc"
 BUILD_DIR="$CMANGOS_DIR/build"
 BIN_DIR="$CMANGOS_DIR/run/bin"
+LOG_DIR="$CMANGOS_DIR/run/logs"
 WOWADMIN="$CMANGOS_DIR/wowadmin.sh"
 
 WSRV_BIN_ORG="mangosd"
@@ -52,6 +53,9 @@ if [[ ! -f "$WSRV_BIN_ORG" ]]; then
     exit 1
 fi
 mv -f "$WSRV_BIN_ORG" "$WSRV_BIN"
+
+echo ">>> Clearing old logs in $LOG_DIR ..."
+rm -f "$LOG_DIR"/*.log
 
 echo ">>> Restarting server via wowadmin.sh ..."
 cd "$CMANGOS_DIR"
