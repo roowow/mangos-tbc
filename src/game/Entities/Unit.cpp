@@ -9307,6 +9307,8 @@ int32 Unit::CalculateAuraDuration(SpellEntry const* spellInfo, uint32 effectMask
 
     int32 durationMod = mechanicMod;
 
+    int32 originalDuration = duration;
+
     if (durationMod != 0)
     {
         duration = int32(int64(duration) * (100 + durationMod) / 100);
@@ -9314,6 +9316,10 @@ int32 Unit::CalculateAuraDuration(SpellEntry const* spellInfo, uint32 effectMask
         if (duration < 0)
             duration = 0;
     }
+
+    if (mechanicMask & convertEnumToFlag(MECHANIC_DISARM))
+        sLog.outString("[DISARM DEBUG] spell %u on %s: base duration=%dms, mechanicMod=%d%%, final duration=%dms",
+                        spellInfo->Id, GetGuidStr().c_str(), originalDuration, durationMod, duration);
 
     return duration;
 }

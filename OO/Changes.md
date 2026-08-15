@@ -462,6 +462,10 @@ if (map && map->IsDungeon() && !map->IsRaid())
 
 **处理方式**：讨论过"只在 `SendMessageToAllWhoSeeMeMove` 里补一个兜底"的最小改法，但该commit本身还捆绑了`MovementHandler.cpp`4处ack回显去重（charm/possess操控生物移动时给自己回显重复移动包的老问题），补丁式修复会让代码状态偏离"这个commit到底做没做"的清晰判断。最终选择**整体 `git revert`**，干净回到该commit之前的状态：新提交 `e3dc1ea3e`，5个文件（`Object.h`/`Unit.h`/`Unit.cpp`/`MovementHandler.cpp`/`MoveSplineInit.cpp`）全部撤销。副作用：charm/possess回显重复移动包的老问题会重新出现，但只在魅惑/操控场景触发，非阻断性瑕疵，优先级远低于"飞行卡死"这个玩法性bug。
 
+**验证曲折**：revert部署后用户首次反馈"问题依旧存在"，一度怀疑根因判断错误，转而对今天合并会话的~25个commit做二分排查（逐个checkout+编译测试）。排查到只剩`1f9c81b0d`（法力灼烧战斗日志删除，纯日志行，与移动毫无关联）这种明显不可能的commit"测出"有问题时，判断是二分过程中反复`git checkout`新旧commit导致增量编译（`make`按文件mtime判断是否重新编译）漏编译，测的其实是上一次的旧二进制，不是当次checkout真正对应的代码。要求用户对疑似commit重新**干净编译**（删build目录重新cmake）复测，结果`1076c2cd8`原始版本干净编译后确认飞行异常，`v3`（含revert `e3dc1ea3e`）干净编译后确认飞行正常——与最初的代码级根因分析完全吻合，实锤`1076c2cd8`就是唯一元凶，之前revert"无效"的反馈是增量编译假阳性。
+
+**状态**：✅ 已通过干净编译复测确认，`v3`当前状态（含revert `e3dc1ea3e`）飞行功能正常，症状1解决。
+
 **状态**：✅ 已在本地revert提交（`e3dc1ea3e`），待部署验证。
 
 **待办**：下次继续时先处理 `ff9de1d6e` 的决定，再用 `git log --reverse --oneline --cherry-pick --right-only v3...origin/master` 查出后续，继续逐条审查。
