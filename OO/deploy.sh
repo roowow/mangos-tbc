@@ -49,7 +49,6 @@ if [[ ! -f "$WSRV_BIN_ORG" ]]; then
     echo ">>> ERROR: $BIN_DIR/$WSRV_BIN_ORG not found after install, aborting before touching the running server." >&2
     exit 1
 fi
-mv -f "$WSRV_BIN_ORG" "$WSRV_BIN"
 
 echo ">>> Clearing old logs in $LOG_DIR ..."
 rm -f "$LOG_DIR"/*.log

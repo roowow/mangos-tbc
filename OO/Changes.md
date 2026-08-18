@@ -236,33 +236,7 @@ ORDER BY levelGap DESC;
 **⚠️ 上线后自查发现的第二个缺口（用户直接指出）**：第一版实现把 Exp0 替换 + 副本×1.65 直接写在 `if (damage)` 里，而这个分支覆盖的是**所有**带 `SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL` 属性的法术，不只是我们204清单里"spellLevel远低于实际等级"这批真正有bug的——很多正常设计的怪物技能也用这个属性，只是它们的 `spellLevel` 本来就跟怪物实际等级很接近（小等级差，原版设计如此，不受这个bug影响）。之前的写法会把这些**本来就没问题**的技能也强行按新公式重算，副本场景还会被强行乘上 ×1.65，属于扩大了改动范围。**修复**：补回原始204清单排查用的同一个判定标准——`levelGap = 施法者等级 - spellLevel >= 30` 才进入新公式分支，否则原样走没改过的旧公式（施法者自己的 `Expansion`，不叠加副本倍数）。这样改动范围被精确收紧到"确认受影响的这一批"，不多不少。
 
 **核心公式改动**（`Object.cpp`，`WorldObject::CalculateSpellEffectValue`）：
-```cpp
-if (damage)
-{
-    CreatureInfo const* cInfo = static_cast<Creature const*>(unitCaster)->GetCreatureInfo();
-    int32 levelGap = int32(unitCaster->GetLevel()) - int32(spellProto->spellLevel);
-    if (levelGap >= 30)          // 跟204清单排查用的同一个阈值，只处理确认受影响的这批
-    {
-        CreatureClassLvlStats const* casterCLS = sObjectMgr.GetCreatureClassLvlStats(unitCaster->GetLevel(), cInfo->UnitClass, 0);
-        CreatureClassLvlStats const* spellCLS = sObjectMgr.GetCreatureClassLvlStats(spellProto->spellLevel, cInfo->UnitClass, 0);
-        if (casterCLS && spellCLS)
-        {
-            float ratio = casterCLS->BaseDamage / spellCLS->BaseDamage;
-            Map const* map = unitCaster->GetMap();
-            if (map && map->IsDungeon() && !map->IsRaid())
-                ratio *= map->IsRegularDifficulty() ? 1.65f : 1.75f;   // 2026-08-14：普通/英雄分开系数，见下方记录
-            value = value * ratio;
-        }
-    }
-    else                          // 不在受影响范围内，原样走旧公式（未改动）
-    {
-        CreatureClassLvlStats const* casterCLS = sObjectMgr.GetCreatureClassLvlStats(unitCaster->GetLevel(), cInfo->UnitClass, cInfo->Expansion);
-        CreatureClassLvlStats const* spellCLS = sObjectMgr.GetCreatureClassLvlStats(spellProto->spellLevel, cInfo->UnitClass, cInfo->Expansion);
-        if (casterCLS && spellCLS)
-            value = value * (casterCLS->BaseDamage / spellCLS->BaseDamage);
-    }
-}
-```
+
 
 **旧手动覆盖的去留判定**：对全部34个已修复数据点，用"新公式预测值 / 我们定的值"算贴近度，`±15%` 以内视为"贴近，可退役"（备注掉，不删除，保留代码供以后核对/回滚），否则保留手动覆盖。结果：
 

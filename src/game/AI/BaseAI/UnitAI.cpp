@@ -1221,7 +1221,15 @@ void UnitAI::UpdateSpellLists()
         {
             SpellEntry const* spellInfo = sSpellTemplate.LookupEntry<SpellEntry>(spell.SpellId);
             float maxRange = CalculateSpellRange(spellInfo);
-            if (!sObjectMgr.IsCombatConditionSatisfied(spell.CombatCondition, m_unit, maxRange))
+            bool satisfied = sObjectMgr.IsCombatConditionSatisfied(spell.CombatCondition, m_unit, maxRange);
+
+            // TEMP DEBUG (Nethekurse Dark Spin health-gate investigation): scoped to spell 30502 only,
+            // so it won't spam for every other creature's conditioned spells on the server.
+            if (spell.SpellId == 30502)
+                sLog.outString("[DARKSPIN DEBUG] entry=%u dbGuid=%u health=%.1f%% combatCondition=%d satisfied=%d",
+                                m_unit->GetEntry(), m_unit->GetDbGuid(), m_unit->GetHealthPercent(), spell.CombatCondition, satisfied);
+
+            if (!satisfied)
                 continue;
         }
 
