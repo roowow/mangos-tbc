@@ -1690,10 +1690,16 @@ bool Creature::LoadFromDB(uint32 dbGuid, Map* map, uint32 newGuid, uint32 forced
         return false;
     }
 
-    // Creature can be loaded already in map if grid has been unloaded while creature walk to another grid
+    // Creature can be loaded already in map if grid has been unloaded while creature walk to another grid.
+    // Also guards against respawning over a creature whose corpse hasn't been cleaned up yet (corpseDelay
+    // is normally capped below respawnDelay so this shouldn't happen, but if corpse removal is delayed for
+    // any reason, spawning a second Creature for the same dbGuid here would collide with the still-registered
+    // corpse object when it registers itself - see OO/Changes.md duplicate-guid crash investigation).
+    // Bailing out (rather than only checking IsAlive()) means this spawn attempt is simply retried next tick
+    // by SpawnManager once the old object is actually gone.
     {
         Creature* existing = map->GetCreature(dbGuid);
-        if (existing && existing->IsAlive())
+        if (existing)
             return false;
     }
 
