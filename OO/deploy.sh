@@ -9,15 +9,14 @@
 #   bash ~/cmangos/mangos-tbc/OO/deploy.sh
 #
 # Mirrors the manual steps:
-#   cd cmangos/mangos-tbc && git pull <remote> <branch>
+#   cd cmangos/mangos-tbc && git pull
 #   cd ../build && make install
 #   cd ../run/bin && mv mangosd cangosd
 #   cd ../.. && ./wowadmin.sh wrestart
 #
-# Remote/branch are configurable so this works with either the upstream repo
-# checkout (origin) or a fork tracked under a different remote name, e.g.:
-#   bash OO/deploy.sh                        # uses defaults below (roowow v3)
-#   GIT_REMOTE=origin GIT_BRANCH=master bash OO/deploy.sh
+# Uses a bare `git pull`, relying on each checkout's already-configured
+# upstream tracking branch - so this works unmodified regardless of what the
+# remote happens to be named on a given server (roowow, origin, etc.).
 
 set -euo pipefail
 
@@ -32,15 +31,13 @@ LOG_DIR="$CMANGOS_DIR/run/logs"
 WOWADMIN="$CMANGOS_DIR/wowadmin.sh"
 
 WSRV_BIN_ORG="mangosd"
-WSRV_BIN="cangosd"
+WSRV_BIN="mangosd"
 
 MAKE_JOBS="${MAKE_JOBS:-$(nproc)}"
-GIT_REMOTE="${GIT_REMOTE:-roowow}"
-GIT_BRANCH="${GIT_BRANCH:-v3}"
 
-echo ">>> Pulling latest source ($GIT_REMOTE $GIT_BRANCH) in $MANGOS_TBC_DIR ..."
+echo ">>> Pulling latest source in $MANGOS_TBC_DIR ..."
 cd "$MANGOS_TBC_DIR"
-git pull "$GIT_REMOTE" "$GIT_BRANCH"
+git pull
 
 echo ">>> Building and installing (make install -j$MAKE_JOBS) in $BUILD_DIR ..."
 cd "$BUILD_DIR"
