@@ -23,6 +23,8 @@
 #include "Platform/Define.h"
 #include "Policies/ThreadingModel.h"
 
+#include <mutex>
+
 #include "Server/DBCStructure.h"
 #include "Maps/GridDefines.h"
 #include "Grids/Cell.h"
@@ -462,6 +464,16 @@ class Map : public GridRefManager<NGridType>
 
         bool isGridObjectDataLoaded(uint32 x, uint32 y) const { return getNGrid(x, y)->isGridObjectDataLoaded(); }
         void setGridObjectDataLoaded(bool pLoaded, uint32 x, uint32 y) { getNGrid(x, y)->setGridObjectDataLoaded(pLoaded); }
+
+        // Guards the check-and-set of isGridObjectDataLoaded()/ObjectGridLoader::LoadN() in EnsureGridLoaded().
+        // Normally only this map's own MapUpdater thread touches its grids, but some synchronous callers (e.g.
+        // player login restoring passive auras that force a visibility refresh) can reach EnsureGridLoaded()
+        // from the main thread while a MapUpdater worker is concurrently ticking the same map, racing to load
+        // the same grid and double-inserting the same creature guid into the grid's object container - hits
+        // the "Object with certain key already in but objects are different!" assert in TypeContainer.h.
+        // Recursive because EnsureGridLoaded() can legitimately re-enter on the same thread (an active object
+        // being loaded/added can summon another active object, which triggers grid loading again).
+        std::recursive_mutex m_gridLoadMutex;
 
         void setNGrid(NGridType* grid, uint32 x, uint32 y);
         void ScriptsProcess();

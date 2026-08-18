@@ -478,14 +478,57 @@ if (map && map->IsDungeon() && !map->IsRaid())
 
 这不是DB数据问题，是引擎里一个通用判断函数的逻辑bug；查了一下DB，全库有2306条技能存在"光环效果+非光环效果混合"的模式，理论上都会经过这个错误判断，但实际会表现出肉眼可见差异的，需要同时满足"光环和非光环效果打在同一目标"+"目标身上有对应机制减免/弹射判定在生效"，范围小得多，目前实锤的只有这一例。
 
-**处理方式**：用户明确要求限定影响范围、暂不做全局修复，等后续观察是否有其他同类反馈再决定要不要推广。最终方案：
+**处理方式**：用户明确要求限定影响范围、暂不做全局修复，等后续观察是否有其他同类反馈再决定要不要推广。方案：
 - 保留原有`IsAuraApplyEffects()`函数完全不动（`Spell.cpp:5329`光环弹射逻辑那处调用不受任何影响）
 - 新增一个`HasAnyAuraApplyEffect()`函数（正确的"只要有一个是光环效果就算数"逻辑），只在`Spell.cpp:1046`附近`CalculateAuraDuration`调用前的开关处，**且仅当命中效果的机制掩码包含`MECHANIC_DISARM`(缴械)时**才启用这个修正判断，其他机制（眩晕/减速/沉默等）继续走原来的（有bug的）判断，行为不变
 
-修改文件：`src/game/Spells/SpellMgr.h`（新增函数）、`src/game/Spells/Spell.cpp`（缴械机制专属的开关判断）。
+**第二个断点（复测时发现）**：按上面方案改完部署后，日志显示`CalculateAuraDuration`确实算出了`mechanicMod=-50%`/`final duration=3000ms`，但缴械光环实际生效的地方(`Aura::HandleAuraModDisarm`)显示挂到玩家身上的还是`duration=6000ms`——减免结果被算出来了，但没有真正用到实际光环上。往下查到`Spell::DoSpellHitOnUnit`：真正创建光环对象时，时长来自`SpellAuraHolder`构造函数**自己独立重新计算**的原始值，根本不看`AddUnitTarget`里算出来的`effectDuration`，只有"目标命中了递减返回(Diminishing Returns)分组"时才会被覆盖——而缴械机制在这个引擎里没配递减返回分组，所以减免结果从头到尾没有生效的机会。
 
-**待办**：临时调试日志（`[DISARM DEBUG]`，分布在`Unit.cpp`/`SpellAuras.cpp`/`Spell.cpp`）还没清理，等修复效果编译部署验证通过后一并删除。如果后续还有其他"机制减免类天赋没生效"的类似反馈，再考虑把`IsAuraApplyEffects()`的判断逻辑做成全局修复（`ANY`而非`ALL`），而不是每个机制单独开口子。
+同样按"仅缴械机制生效"的范围限定，在`Spell.cpp:1495`附近（`DoSpellHitOnUnit`里真正构造光环时长的地方）加了第二处修复：命中效果带缴械机制、且`AddUnitTarget`算出的`effectDuration`比原始时长短时，用这个减免后的值覆盖。
 
-**状态**：⏳ 代码已改（范围限定为缴械机制），等待编译部署+日志复测确认。
+修改文件：`src/game/Spells/SpellMgr.h`（新增`HasAnyAuraApplyEffect`函数）、`src/game/Spells/Spell.cpp`（两处缴械机制专属的开关判断，`AddUnitTarget`+`DoSpellHitOnUnit`）。
 
-**待办**：下次继续时先处理 `ff9de1d6e` 的决定，再用 `git log --reverse --oneline --cherry-pick --right-only v3...origin/master` 查出后续，继续逐条审查。
+**验证**：用户现场测试+抓日志确认，缴械光环实际`duration=3000ms`，3秒后消失，武器掌握-50%减免正常生效。调试日志（`[DISARM DEBUG]`，分布在`Unit.cpp`/`SpellAuras.cpp`/`Spell.cpp`）已清理干净，两个文件（`Unit.cpp`/`SpellAuras.cpp`）已完全还原到改动前状态（这两处从头到尾只加过调试日志，没有实际逻辑改动）。
+
+**待办**：如果后续还有其他"机制减免类天赋没生效"的类似反馈，再考虑把`IsAuraApplyEffects()`判断逻辑（`ANY`而非`ALL`）和`DoSpellHitOnUnit`里的时长覆盖逻辑做成全局修复，而不是每个机制单独开口子。
+
+**状态**：✅ 已通过日志实测确认修复生效，症状解决。
+
+### 崩溃排查：`TypeContainer.h:102` 断言崩溃，疑似跨线程竞态（2026-08-17，wdstart崩溃日志机制修好后首次抓到）
+
+**背景**：新服务器（r02→r04一路排查下来）之前`wowadmin.sh`是用`wstart`（非debug模式）起的，从未被gdb包裹运行，导致不管崩多少次都没有crash log。确认根因后改用`wdstart`重新起服务，这是修好之后第一次真正抓到的崩溃（`crash1801.txt`）。
+
+**现象**：`SIGABRT`，断言失败：
+```
+i->second == obj && "Object with certain key already in but objects are different!"
+    at src/framework/GameSystem/TypeContainer.h:102
+```
+意思是：往地图的生物guid查找容器里插入一个新对象时，发现这个guid（64309，entry 18123）已经存在，但绑定的是**另一个不同的对象指针**。
+
+**触发链路**：玩家登录 → `Player::LoadFromDB` → `_LoadSpells`恢复技能列表（285个）→ 恢复到技能2836时重新CastSpell生效 → 该技能带"侦测隐身"光环(`SPELL_AURA_MOD_INVISIBILITY_DETECTION`) → 施加时强制刷新玩家周围可见性(`Camera::UpdateVisibilityForOwner`) → 发现所在网格(grid 33,43 / cell 0,8)未加载 → `Map::EnsureGridLoaded`触发`ObjectGridLoader::LoadN()`加载该网格 → 加载时插入creature guid=64309 时断言失败。
+
+**排查过程**：
+1. 查了14个线程的完整栈，除崩溃线程（主线程，处理`WorldSession::HandlePlayerLogin`，走的是`World::Update`→`UpdateResultQueue`这条**主线程**路径）外，另外2个`MapUpdater`工作线程当时都是空闲等待状态（阻塞在`ProducerConsumerQueue::WaitAndPop`）——不是"崩溃瞬间"的多线程竞争。
+2. 查了`isGridObjectDataLoaded`这个"网格是否已加载"标记的全部代码路径：整个引擎里只有一处会置`true`（`Map.cpp:404`，加载前先标记，注释里明确写了是为了防止"同线程内递归重复加载"），**没有任何地方会重置回`false`**（网格卸载不走这条，且该服务器`GridUnload=0`本来就禁用了卸载）。理论上一旦加载过就该永远是`true`，不该再触发二次加载。
+3. 查了`Player::LoadFromDB`函数体，`_LoadSpells`调用之前，本次登录流程内没有任何代码碰过网格加载——排除"同一次登录自己重复加载"。
+4. 综合1-3，最合理的解释：**崩溃发生的那个时间点前后，另一个线程（大概率是某个`MapUpdater`工作线程处理该地图的正常每帧tick）几乎同时碰了同一张地图的同一个网格**，两边都读到"未加载"，都各自走了一遍加载流程并各自new了一个entry=18123/guid=64309的Creature对象，插入时后一个发现key已存在但对象不同，断言崩溃。核对代码全程未加锁保护，跟这个猜测吻合；MapUpdater线程能在崩溃快照时已经空闲，只说明它的那次访问在崩溃前就已经完成，不排除竞态。
+5. 排查了合并会话的改动范围，`Camera.cpp`/`Map.cpp`/`ObjectGridLoader.cpp`/`TypeContainer.h`都没被今天任何一条合并动过——**确认是引擎里一直存在的老bug，不是最近改动引入的**，这次只是被修好的crash log机制第一次真正抓到。
+
+**对比vmangos（`D:\其他\wow\Development\remote\r05_core_dev`，用户反馈从未遇到过同类问题）**：
+- vmangos的`Map`类专门有一把`mutable std::shared_timed_mutex m_objectsStore_lock`保护guid查找表，`InsertObject<T>`/`EraseObject<T>`/`GetObject<T>`全部套了锁：
+  ```cpp
+  template <typename T> void InsertObject(ObjectGuid const& guid, T* ptr)
+  {
+      std::lock_guard<std::shared_timed_mutex> lock(m_objectsStore_lock);
+      m_objectsStore.insert<T>(guid, ptr);
+  }
+  ```
+- vmangos的`Creature::AddToWorld()`直接调用这个加锁的`InsertObject`，跟cmangos这次崩溃的调用链（`Creature::AddToWorld`→`Map::Add<Creature>`→`TypeUnorderedMapContainer::insert`，**全程无锁**）是同一个操作的两种实现。
+- 复杂点：vmangos把"guid查找表"(`m_objectsStore`)和"网格空间归属"拆成了两个独立数据结构，只有前者加锁；cmangos的`TypeContainer.h`那套模板把两者揉在了一起，guid插入和网格加载是同一套机制，照搬vmangos的细粒度锁不是直接能复制粘贴的活，需要更粗粒度的锁或结构性拆分。
+
+**处理方式**：⏸️ 已跟用户对齐两个候选方案，尚未选定/实施：
+- 方案A：在cmangos的`Map::Add<T>`+`EnsureGridLoaded`临界区补一把粗粒度锁（工作量小，锁粒度粗，可能有性能/死锁风险需要评估）
+- 方案B：参照vmangos结构性拆分出独立的guid查找表+细粒度锁（更彻底但改动面大）
+- 备选（未采纳）：插入前多判一次，key已存在就跳过/记日志而非断言崩溃，属于掩盖症状而非根治
+
+**状态**：⏸️ 问题已定位、根因已找到、参考方案已确认，触发概率低（需要精确时机撞车），暂未决定何时/是否动手修复，先记录在案。

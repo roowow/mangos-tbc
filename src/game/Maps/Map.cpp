@@ -390,6 +390,10 @@ void Map::EnsureGridLoadedAtEnter(const Cell& cell, Player* player)
 
 bool Map::EnsureGridLoaded(const Cell& cell)
 {
+    // See m_gridLoadMutex declaration (Map.h) - guards against a concurrent MapUpdater thread
+    // racing to load/create the same grid.
+    std::lock_guard<std::recursive_mutex> gridLoadLock(m_gridLoadMutex);
+
     EnsureGridCreated(GridPair(cell.GridX(), cell.GridY()));
     NGridType* grid = getNGrid(cell.GridX(), cell.GridY());
 
