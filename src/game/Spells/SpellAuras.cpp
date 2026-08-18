@@ -3960,9 +3960,6 @@ void Aura::HandleAuraModDisarm(bool apply, bool Real)
 
     Unit* target = GetTarget();
 
-    sLog.outString("[DISARM DEBUG] HandleAuraModDisarm spell %u on %s: apply=%d duration=%dms maxDuration=%dms",
-                    GetId(), target->GetGuidStr().c_str(), apply, GetAuraDuration(), GetAuraMaxDuration());
-
     if (!apply && target->HasAuraType(GetModifier()->m_auraname))
         return;
 

@@ -9288,18 +9288,11 @@ bool Unit::SelectHostileTarget()
 //======================================================================
 int32 Unit::CalculateAuraDuration(SpellEntry const* spellInfo, uint32 effectMask, int32 duration, Unit const* /*caster*/)
 {
-    if (spellInfo->Id == 36207 || spellInfo->Id == 36208)
-        sLog.outString("[DISARM DEBUG] ENTRY spell %u on %s: incoming duration=%dms, effectMask=%u",
-                        spellInfo->Id, GetGuidStr().c_str(), duration, effectMask);
-
     if (duration <= 0)
         return duration;
 
     int32 mechanicMod = 0;
     uint32 mechanicMask = GetSpellMechanicMask(spellInfo, effectMask);
-
-    if (spellInfo->Id == 36207 || spellInfo->Id == 36208)
-        sLog.outString("[DISARM DEBUG] spell %u on %s: mechanicMask=%u", spellInfo->Id, GetGuidStr().c_str(), mechanicMask);
 
     for (int32 mechanic = FIRST_MECHANIC; mechanic < MAX_MECHANIC; ++mechanic)
     {
@@ -9314,8 +9307,6 @@ int32 Unit::CalculateAuraDuration(SpellEntry const* spellInfo, uint32 effectMask
 
     int32 durationMod = mechanicMod;
 
-    int32 originalDuration = duration;
-
     if (durationMod != 0)
     {
         duration = int32(int64(duration) * (100 + durationMod) / 100);
@@ -9323,10 +9314,6 @@ int32 Unit::CalculateAuraDuration(SpellEntry const* spellInfo, uint32 effectMask
         if (duration < 0)
             duration = 0;
     }
-
-    if ((mechanicMask & convertEnumToFlag(MECHANIC_DISARM)) || spellInfo->Id == 36207 || spellInfo->Id == 36208)
-        sLog.outString("[DISARM DEBUG] spell %u on %s: base duration=%dms, mechanicMod=%d%%, final duration=%dms",
-                        spellInfo->Id, GetGuidStr().c_str(), originalDuration, durationMod, duration);
 
     return duration;
 }
