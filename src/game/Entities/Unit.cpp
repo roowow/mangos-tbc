@@ -5571,6 +5571,12 @@ void Unit::RemoveAurasWithInterruptFlags(uint32 flags)
     {
         if (iter->second->GetSpellProto()->AuraInterruptFlags & flags)
         {
+            // TEMP DEBUG (mount-specific water-dismount investigation): only fires when a MOUNTED aura
+            // is actually being torn down by this call, confirming the water-liquid path is what removed it.
+            if (iter->second->HasAuraType(SPELL_AURA_MOUNTED))
+                sLog.outString("[MOUNT WATER DEBUG] RemoveAurasWithInterruptFlags removing mount aura spellId=%u (AuraInterruptFlags=%u) due to flags=%u",
+                                iter->second->GetId(), iter->second->GetSpellProto()->AuraInterruptFlags, flags);
+
             RemoveSpellAuraHolder(iter->second);
             iter = m_spellAuraHolders.begin();
         }
