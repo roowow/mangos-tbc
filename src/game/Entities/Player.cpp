@@ -20824,16 +20824,7 @@ void Player::UpdateTerainEnvironmentFlags(Map* m, float x, float y, float z)
     SetEnvironmentFlags(ENVIRONMENT_FLAG_HIGH_SEA, (liquid_status.type_flags & MAP_LIQUID_TYPE_DEEP_WATER));
 
     // All liquid types: check if deep enough level for swimming
-    bool highLiquid = (res & (LIQUID_MAP_UNDER_WATER | LIQUID_MAP_IN_WATER)) && liquid_status.level > (liquid_status.depth_level + collisionHeight * 0.75);
-
-    // TEMP DEBUG (mount-specific water-dismount investigation): only while actually mounted and touching
-    // liquid, so this stays scoped to the exact test scenario rather than firing on every movement tick.
-    if (GetMountID())
-        sLog.outString("[MOUNT WATER DEBUG] player=%s mountId=%u mountDisplayId=%u collisionHeight=%.3f liquidLevel=%.3f depthLevel=%.3f res=%u highLiquid=%d",
-                        GetName(), GetMountID(), GetUInt32Value(UNIT_FIELD_MOUNTDISPLAYID), collisionHeight,
-                        liquid_status.level, liquid_status.depth_level, res, highLiquid);
-
-    SetEnvironmentFlags(ENVIRONMENT_FLAG_HIGH_LIQUID, highLiquid);
+    SetEnvironmentFlags(ENVIRONMENT_FLAG_HIGH_LIQUID, ((res & (LIQUID_MAP_UNDER_WATER | LIQUID_MAP_IN_WATER)) && liquid_status.level > (liquid_status.depth_level + collisionHeight * 0.75)));
 }
 
 bool ItemPosCount::isContainedIn(ItemPosCountVec const& vec) const
