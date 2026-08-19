@@ -12485,7 +12485,13 @@ float Unit::GetCollisionHeight() const
                 MANGOS_ASSERT(displayInfo);
                 CreatureModelDataEntry const* modelData = sCreatureModelDataStore.LookupEntry(displayInfo->ModelId);
                 MANGOS_ASSERT(modelData);
-                float const collisionHeight = scaleMod * (mountModelData->MountHeight + modelData->CollisionHeight * modelData->Scale * displayInfo->scale * 0.5f);
+                // Some mount models have a missing/zero MountHeight in CreatureModelData.dbc (e.g. Fiery
+                // Warhorse), which silently collapses this to roughly half the rider's own standing height
+                // instead of the elevated-on-a-mount height it should be - shallow water then misclassifies
+                // as swimming depth and force-dismounts only on that specific mount. Fall back to the
+                // default collision height for just the mount's contribution when the dbc value is missing.
+                float const mountHeight = mountModelData->MountHeight != 0.0f ? mountModelData->MountHeight : DEFAULT_COLLISION_HEIGHT;
+                float const collisionHeight = scaleMod * (mountHeight + modelData->CollisionHeight * modelData->Scale * displayInfo->scale * 0.5f);
                 return collisionHeight == 0.0f ? DEFAULT_COLLISION_HEIGHT : collisionHeight;
             }
         }
