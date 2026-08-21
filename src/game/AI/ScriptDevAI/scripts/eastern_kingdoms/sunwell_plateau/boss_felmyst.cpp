@@ -115,6 +115,7 @@ enum FelmystActions
     FELMYST_TRANSITION_DELAY,
     FELMYST_SIDE_DELAY,
     FELMYST_DUMMY_NUKE,
+    FELMYST_AGGRO_FAILSAFE,
 };
 
 struct boss_felmystAI : public CombatAI
@@ -135,6 +136,7 @@ struct boss_felmystAI : public CombatAI
         AddCustomAction(FELMYST_TRANSITION_DELAY, true, [&]() { HandleTransitionDelay(); });
         AddCustomAction(FELMYST_SIDE_DELAY, true, [&]() { HandleSideMove(); });
         AddCustomAction(FELMYST_DUMMY_NUKE, true, [&]() { HandleDummyNuke(); });
+        AddCustomAction(FELMYST_AGGRO_FAILSAFE, true, [&]() { HandleAggroLandingFailsafe(); });
         AddOnKillText(SAY_KILL_1, SAY_KILL_2);
         m_creature->SetStandState(UNIT_STAND_STATE_SLEEP);
         if (m_instance)
@@ -270,6 +272,28 @@ struct boss_felmystAI : public CombatAI
         }
         SetCombatScriptStatus(true);
         m_creature->SetTarget(nullptr);
+        // failsafe in case the landing point ends up unreachable (e.g. aggro player standing near the arena edge)
+        // and the MovementInform(POINT_AGGRO) callback below never fires
+        ResetTimer(FELMYST_AGGRO_FAILSAFE, 8000);
+    }
+
+    void FinishAggroLanding()
+    {
+        m_creature->HandleEmote(EMOTE_ONESHOT_LAND);
+        m_creature->SetLevitate(false);
+        m_creature->SetHover(false);
+        m_creature->GetMotionMaster()->MoveIdle();
+        ResetTimer(FELMYST_WAYPOINT_DELAY, 3000);
+        m_animationSpawnStage = 4; // should already be 3 but sanity assignment
+    }
+
+    // MovementInform(POINT_AGGRO) never fired - the aggro landing point was unreachable
+    // (e.g. collision with the arena boundary). Stop the stuck flight attempt and force
+    // the same transition into normal ground combat that a successful landing would do.
+    void HandleAggroLandingFailsafe()
+    {
+        m_creature->GetMotionMaster()->Clear(false, true);
+        FinishAggroLanding();
     }
 
     void JustDied(Unit* /*killer*/) override
@@ -346,12 +370,8 @@ struct boss_felmystAI : public CombatAI
                 HandleTransition();
                 break;
             case POINT_AGGRO:
-                m_creature->HandleEmote(EMOTE_ONESHOT_LAND);
-                m_creature->SetLevitate(false);
-                m_creature->SetHover(false);
-                m_creature->GetMotionMaster()->MoveIdle();
-                ResetTimer(FELMYST_WAYPOINT_DELAY, 3000);
-                m_animationSpawnStage = 4; // should already be 3 but sanity assignment
+                DisableTimer(FELMYST_AGGRO_FAILSAFE); // reached the landing point normally, failsafe no longer needed
+                FinishAggroLanding();
                 break;
         }
     }

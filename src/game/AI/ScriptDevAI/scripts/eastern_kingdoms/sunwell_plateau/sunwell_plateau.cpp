@@ -347,7 +347,11 @@ void instance_sunwell_plateau::SetData(uint32 type, uint32 data)
             if (data == IN_PROGRESS && GetData(TYPE_BRUTALLUS) != DONE)
                 BanPlayersIfNoGm("Player engaged felmyst without killing brutallus and Gamemaster being present in instance.");
             if (data == DONE)
+            {
                 StartNextDialogueText(NPC_KALECGOS_MADRIGOSA);
+                if (GameObject* fireBarrier = GetSingleGameObjectFromStorage(GO_FIRE_BARRIER))
+                    fireBarrier->SetGoState(GO_STATE_ACTIVE);
+            }
             else if (data == IN_PROGRESS)
                 DoSortFlightTriggers();
             if (data == FAIL || data == DONE)

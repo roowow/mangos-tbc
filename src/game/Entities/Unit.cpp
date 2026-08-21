@@ -5020,9 +5020,6 @@ bool Unit::AddSpellAuraHolder(SpellAuraHolder* holder)
                 // Aura can stack on self -> Stack it;
                 if (aurSpellInfo->StackAmount)
                 {
-                    if (aurSpellInfo->Id == 20050 || aurSpellInfo->Id == 20052 || aurSpellInfo->Id == 20053 || aurSpellInfo->Id == 20054 || aurSpellInfo->Id == 20055)
-                        sLog.outString("[VENGEANCE DEBUG] AddSpellAuraHolder found existing holder spell=%u target=%s foundStack=%u incomingStack=%u protoMax=%u",
-                                        aurSpellInfo->Id, GetGuidStr().c_str(), foundHolder->GetStackAmount(), holder->GetStackAmount(), aurSpellInfo->StackAmount);
                     // can be created with >1 stack by some spell mods
                     foundHolder->ModStackAmount(holder->GetStackAmount(), holder->GetCaster());
                     return false;
@@ -5150,10 +5147,6 @@ bool Unit::AddSpellAuraHolder(SpellAuraHolder* holder)
             }
         }
     }
-
-    if (holder->GetId() == 20050 || holder->GetId() == 20052 || holder->GetId() == 20053 || holder->GetId() == 20054 || holder->GetId() == 20055)
-        sLog.outString("[VENGEANCE DEBUG] AddSpellAuraHolder creating NEW holder spell=%u target=%s newStack=%u",
-                        holder->GetId(), GetGuidStr().c_str(), holder->GetStackAmount());
 
     // add aura, register in lists and arrays
     holder->_AddSpellAuraHolder();

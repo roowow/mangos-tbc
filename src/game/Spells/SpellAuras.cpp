@@ -7994,10 +7994,6 @@ bool SpellAuraHolder::ModStackAmount(int32 num, Unit* newCaster)
         return true; // need remove aura
     }
 
-    if (m_spellProto->Id == 20050 || m_spellProto->Id == 20052 || m_spellProto->Id == 20053 || m_spellProto->Id == 20054 || m_spellProto->Id == 20055)
-        sLog.outString("[VENGEANCE DEBUG] ModStackAmount spell=%u before=%u num=%d protoMax=%u computed=%d",
-                        m_spellProto->Id, m_stackAmount, num, protoStackAmount, stackAmount);
-
     // Update stack amount
     SetStackAmount(stackAmount, newCaster);
     return false;
@@ -8038,10 +8034,6 @@ void SpellAuraHolder::SetStackAmount(uint32 stackAmount, Unit* newCaster)
         m_stackAmount = stackAmount;
         UpdateAuraApplication();
     }
-
-    if (m_spellProto->Id == 20050 || m_spellProto->Id == 20052 || m_spellProto->Id == 20053 || m_spellProto->Id == 20054 || m_spellProto->Id == 20055)
-        sLog.outString("[VENGEANCE DEBUG] SetStackAmount spell=%u requested=%u oldStack=%d finalStack=%u refresh=%d",
-                        m_spellProto->Id, stackAmount, oldStackAmount, m_stackAmount, refresh);
 
     for (auto aur : m_auras)
     {
