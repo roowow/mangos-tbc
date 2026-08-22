@@ -809,21 +809,40 @@ bool Unit::CanReachWithMeleeAttack(Unit const* pVictim, float flat_mod /*= 0.0f*
     MANGOS_ASSERT(pVictim);
 
     float reach = GetCombinedCombatReach(pVictim, true, flat_mod);
+    float const reachBeforeLeeway = reach;
 
+    bool leewayApplied = false;
     if (IsMoving() && !IsWalking() && pVictim->IsMoving() && !pVictim->IsWalking())
+    {
         reach += MELEE_LEEWAY;
+        leewayApplied = true;
+    }
 
     // This check is not related to bounding radius
     float dx = GetPositionX() - pVictim->GetPositionX();
     float dy = GetPositionY() - pVictim->GetPositionY();
 
+    bool result;
+    float rawDist3D = 0.f;
     if (IsPlayerControlled())
     {
         float dz = GetPositionZ() - pVictim->GetPositionZ();
-        return dx * dx + dy * dy + dz * dz < reach* reach;
+        rawDist3D = sqrt(dx * dx + dy * dy + dz * dz);
+        result = dx * dx + dy * dy + dz * dz < reach* reach;
+    }
+    else
+    {
+        rawDist3D = sqrt(dx * dx + dy * dy);
+        result = dx * dx + dy * dy < reach* reach;
     }
 
-    return dx * dx + dy * dy < reach* reach;
+    if (GetEntry() == 18708) // Murmur - temporary investigation logging
+        sLog.outString("[MURMUR REACH DEBUG] self=(%.2f,%.2f,%.2f) moving=%d walking=%d victim=%s victim=(%.2f,%.2f,%.2f) victimMoving=%d victimWalking=%d rawDist=%.2f reachBeforeLeeway=%.2f leewayApplied=%d finalReach=%.2f result=%d",
+                        GetPositionX(), GetPositionY(), GetPositionZ(), IsMoving(), IsWalking(),
+                        pVictim->GetGuidStr().c_str(), pVictim->GetPositionX(), pVictim->GetPositionY(), pVictim->GetPositionZ(), pVictim->IsMoving(), pVictim->IsWalking(),
+                        rawDist3D, reachBeforeLeeway, leewayApplied, reach, result);
+
+    return result;
 }
 
 void Unit::RemoveSpellsCausingAura(AuraType auraType)

@@ -1221,15 +1221,7 @@ void UnitAI::UpdateSpellLists()
         {
             SpellEntry const* spellInfo = sSpellTemplate.LookupEntry<SpellEntry>(spell.SpellId);
             float maxRange = CalculateSpellRange(spellInfo);
-            bool conditionMet = sObjectMgr.IsCombatConditionSatisfied(spell.CombatCondition, m_unit, maxRange);
-            if (spell.SpellId == 33657)
-            {
-                for (Unit* attacker : m_unit->getAttackers())
-                    sLog.outString("[RESONANCE DEBUG] attacker=%s dist=%.2f canReachMelee=%d",
-                                    attacker->GetGuidStr().c_str(), m_unit->GetDistance(attacker), m_unit->CanReachWithMeleeAttack(attacker));
-                sLog.outString("[RESONANCE DEBUG] conditionMet=%d attackerCount=%zu", conditionMet, m_unit->getAttackers().size());
-            }
-            if (!conditionMet)
+            if (!sObjectMgr.IsCombatConditionSatisfied(spell.CombatCondition, m_unit, maxRange))
                 continue;
         }
 
