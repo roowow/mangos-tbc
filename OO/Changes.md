@@ -543,18 +543,48 @@ i->second == obj && "Object with certain key already in but objects are differen
 
 冰冻之环实测伤害2184-2194，跟同一批娜迦系怪物"血鳞魔法师"同类技能（2000-3000，暴击5000）的强度吻合，判定**非bug**；玩家反馈的"伤害形式不对"还需要进一步确认具体现象（是否缺少躲避预警窗口），暂未处理。
 
-### 摩摩尔(18708)近战/共鸣判定距离异常过大——根因是模型数据`combat_reach`小数点错误（2026-08-22，实测日志实锤）
+### 摩摩尔(18708)共鸣(33657)"近战贴身仍触发"排查——最终判定非bug（2026-08-22~08-24，多轮实测+同类boss比对）
 
-**现象**：玩家反馈"共鸣（spell=33657）近战贴身时依然触发"。加调试日志实测后，判定逻辑本身（`NUMBER_OF_MELEE_ATTACKERS==0`）逐帧比对完全正确，但发现`canReachMelee=1`（判定为近战范围内）在实际距离**13~20码**时都会成立，远超正常近战距离。
+**现象**：玩家反馈近战贴身打摩摩尔时，共鸣依然会触发。
 
-**排查过程**：用游戏内距离调试面板截图核对，"Bounding distance"跟调试日志的`dist`字段完全吻合（都是20.46），而面板显示"T -> P Attack distance: 20.00"——摩摩尔对玩家的攻击判定距离高达20码。顺藤摸瓜查到`creature_model_info`表，摩摩尔模型（DisplayId=18839）的`combat_reach`（战斗触及半径）配置成了**13.5**，而`bounding_radius`（碰撞体积半径）只有**0.35**，两者比例严重不匹配（正常同量级）。
+**排查过程（这条走了不少弯路，记录下来避免以后重复踩坑）**：
+1. 第一轮加调试日志实测，发现`canReachMelee=1`（判定近战范围内）在实际距离13~20码都会成立，一度怀疑`creature_model_info`表里摩摩尔模型（DisplayId=18839）的`combat_reach=13.5`是小数点打错（应为1.35），改小后重启实测，共鸣判定距离确实恢复到0~4码——但**玩家反馈改完后站在摩摩尔旁边打不到人，必须走进模型内部才能攻击**，说明1.35改小过头了，先回退到原值13.5。
+2. 第二轮加更详细的调试日志（直接打在`Unit::CanReachWithMeleeAttack`内部，打印双方坐标/移动状态/容错前后的判定半径），排除了`MELEE_LEEWAY`移动容错的干扰（摩摩尔全程静止，`leewayApplied`恒为0），确认`reach≈16.33`码纯粹是`combat_reach=13.5`本身算出来的，逻辑计算没有问题。
+3. 关键反证：查了跟摩摩尔`bounding_radius`（0.35）量级相近的其它已知正常运行的大型/悬浮类boss，发现"小碰撞体积+大战斗触及半径"是这类模型的**普遍设计惯例**，不是数据错误：
 
-**根因**：`combat_reach`很可能是小数点打漏，本该是`1.35`（少打一位小数点，正好差10倍）——这是本轮排查里第三次遇到"差10倍"的数据录入错误（另两次是斩杀射击HP触发条件、熔化护甲叠层间隔）。这个bug影响的不只是共鸣的触发判定，摩摩尔对玩家的**近战攻击距离本身也被同步拉长**了。
+   | 名字 | bounding_radius | combat_reach |
+   |---|---|---|
+   | 摩摩尔 | 0.35 | 13.5 |
+   | 菲米丝（太阳井） | 0.48 | 11.2 |
+   | 纳格法尔（卡拉赞） | 0.45 | 10.5 |
+   | 伊利丹·怒风 | 0.459 | 7.5 |
 
-确认`DisplayId=18839`只有摩摩尔自己在用（entry=18708及英雄版entry=20657），改动范围安全、不影响其他怪物。
+   `combat_reach=13.5`跟菲米丝/纳格法尔是同一量级、同一设计模式，并非孤立异常值。
 
-**修复**：`creature_model_info` 表 `combat_reach` 从 13.5 改成 1.35（modelid=18839）。
+4. 两轮实测（8月22日、8月24日）里，`canReachMelee`跟`conditionMet`（是否触发共鸣）逐帧完全对应，贴身不触发、脱手触发、回来又不触发，**从未出现过"近战在范围内却仍触发"的情况**。
 
-**验证**：`creature_model_info`只在服务器启动时加载，无热更新命令，需重启生效。重启后实测：修复前`canReachMelee=1`在10~20码都会成立；修复后只在0~4码贴身距离才成立，跟`conditionMet`（触发共鸣）的联动逻辑完全正确，问题解决。
+**结论**：判定逻辑（`NUMBER_OF_MELEE_ATTACKERS==0`）本身没有问题，`combat_reach=13.5`大概率是该类大型boss模型的正常设计值，不是数据bug。玩家最初反馈的那次异常没能用日志复现出来，可能是当时触发和贴身近战的时机顺序造成的观感误判。
 
-**状态**：✅ 已在tbcmangosdev实施并通过重启后实测日志确认修复生效。调试日志（`UnitAI.cpp`）已清理，恢复原状。**尚未同步到tbcmangos2**。
+**状态**：✅ 判定为非bug，`combat_reach`维持原值13.5不做改动（tbcmangosdev/tbcmangos2均未变化）。调试日志（`Unit.cpp`）已清理，恢复原状。
+
+### 崩溃排查：看门狗自杀式崩溃，根因是GM命令里一条低效SQL卡死主线程（2026-08-24，crash0824.txt）
+
+**现象**：服务器崩溃，崩溃点是`Master.cpp:94`的`FreezeDetectorRunnable::run`（代码里明确注释`// bang crash`）——这不是随机崩溃，是"卡死检测看门狗"发现主循环长时间没跳动后故意写空指针自杀，目的是留一份能分析的崩溃现场，而不是真正的根因。
+
+**排查过程**：崩溃时刻主世界线程（WorldRunnable）的调用栈显示，当时正卡在`__libc_recv`（等MySQL网络返回），触发源是一个GM在执行`.go creature Duthorian`（按名字查找生物传送）。这个命令内部（[Level2.cpp:581-585](src/game/Chat/Level2.cpp#L581-L585)）会**在主世界线程上同步执行**一条SQL：
+
+```sql
+SELECT creature.guid, creature_spawn_entry.guid
+FROM creature, creature_template, creature_spawn_entry
+WHERE (creature.id = creature_template.entry
+    OR (creature_spawn_entry.entry = creature_template.entry AND creature.guid = creature_spawn_entry.guid))
+AND creature_template.name LIKE '%%%s%%' LIMIT 1;
+```
+
+**根因**：三张表（creature 10.9万行、creature_template 1.8万行、creature_spawn_entry 1.7万行）用`OR`连接两种不同的关联条件，MySQL难以选出高效执行计划；叠加`LIKE '%关键字%'`前置通配符（无法走索引，必须全表扫描`creature_template`），这条查询在这个数据规模下可能跑得极慢。因为是**同步执行在主世界线程**（不是异步查询队列），查询一慢，整个服务器主循环就跟着卡死，久到看门狗判定"卡死"直接自杀重启。
+
+**修复**：
+1. 把`OR`拆成`UNION`的两条独立查询，让MySQL能分别用上两种关联各自的等值索引，避免OR导致的低效执行计划。
+2. **安全边界**：给搜索关键字加最短长度限制（少于3个字符直接拒绝并提示，不发起查询）——关键字太短会匹配`creature_template.name`里很大比例的行，是最容易触发慢查询的情况。
+
+**状态**：✅ 代码已改（[Level2.cpp](src/game/Chat/Level2.cpp)），需重新编译部署。这条查询本身依然是同步执行在主线程上，只是优化后大幅降低了跑慢的概率，没有从架构上根治"GM命令同步查数据库可能卡主线程"这一类问题，后续如果还有类似的GM命令卡死崩溃，需要考虑把这类查询整体改成异步。

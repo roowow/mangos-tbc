@@ -583,12 +583,21 @@ void WorldSession::HandleCharDeleteOpcode(WorldPacket& recv_data)
 
     uint32 lowguid = guid.GetCounter();
 
-    auto queryResult = CharacterDatabase.PQuery("SELECT account,name FROM characters WHERE guid='%u'", lowguid);
+    auto queryResult = CharacterDatabase.PQuery("SELECT account,name,level FROM characters WHERE guid='%u'", lowguid);
     if (queryResult)
     {
         Field* fields = queryResult->Fetch();
         accountId = fields[0].GetUInt32();
         name = fields[1].GetCppString();
+
+        // characters that have reached level 70 can no longer be deleted
+        if (fields[2].GetUInt32() >= 70)
+        {
+            WorldPacket data(SMSG_CHAR_DELETE, 1);
+            data << (uint8)CHAR_DELETE_FAILED;
+            SendPacket(data, true);
+            return;
+        }
     }
 
     // prevent deleting other players' characters using cheating tools

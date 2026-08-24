@@ -577,12 +577,26 @@ bool ChatHandler::HandleGoCreatureCommand(char* args)
             else
             {
                 std::string name = pParam1;
+                // safety boundary: a very short search term matches a large fraction of
+                // creature_template.name, which combined with the LIKE '%...%' full scan below
+                // can turn this into a multi-second synchronous query on the main world thread -
+                // long enough to trip the freeze-detector watchdog and crash the server (see
+                // OO/Changes.md, 2026-08-24 crash investigation).
+                if (name.size() < 3)
+                {
+                    SendSysMessage("Search term too short, please use at least 3 characters.");
+                    SetSentErrorMessage(true);
+                    return false;
+                }
                 WorldDatabase.escape_string(name);
-                auto queryResult = WorldDatabase.PQuery("SELECT creature.guid, creature_spawn_entry.guid "
-                  "FROM creature, creature_template, creature_spawn_entry "
-                  "WHERE (creature.id = creature_template.entry "
-                    "OR (creature_spawn_entry.entry = creature_template.entry AND creature.guid = creature_spawn_entry.guid)) "
-                  "AND creature_template.name LIKE '%%%s%%' LIMIT 1;", name.c_str());
+                auto queryResult = WorldDatabase.PQuery(
+                  "(SELECT creature.guid, 0 FROM creature, creature_template "
+                    "WHERE creature.id = creature_template.entry AND creature_template.name LIKE '%%%s%%') "
+                  "UNION "
+                  "(SELECT creature.guid, creature_spawn_entry.guid FROM creature, creature_template, creature_spawn_entry "
+                    "WHERE creature_spawn_entry.entry = creature_template.entry AND creature.guid = creature_spawn_entry.guid "
+                    "AND creature_template.name LIKE '%%%s%%') "
+                  "LIMIT 1;", name.c_str(), name.c_str());
                 if (!queryResult)
                 {
                     SendSysMessage(LANG_COMMAND_GOCREATNOTFOUND);

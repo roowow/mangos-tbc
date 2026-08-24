@@ -4633,6 +4633,12 @@ bool Spell::DoSummonPet(CreatureSummonPositions& list, SummonPropertiesEntry con
 
 void Spell::EffectLearnSpell(SpellEffectIndex eff_idx)
 {
+    if (m_spellInfo->Id == 18249) // TEMP DEBUG fishing bug
+        sLog.outString("[FISHDBG] EffectLearnSpell entered spell=18249 caster=%s unitTarget=%s unitTargetIsPlayer=%d",
+                        m_caster ? m_caster->GetGuidStr().c_str() : "null",
+                        unitTarget ? unitTarget->GetGuidStr().c_str() : "null",
+                        unitTarget ? int(unitTarget->IsPlayer()) : -1);
+
     if (!unitTarget)
         return;
 
