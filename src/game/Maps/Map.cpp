@@ -407,11 +407,6 @@ bool Map::EnsureGridLoaded(const Cell& cell)
         // summons some active object B, while B added to map grid loading called again and so on..
         setGridObjectDataLoaded(true, cell.GridX(), cell.GridY());
 
-        // TEMP DEBUG (duplicate-guid crash investigation): fires once per real (cold) grid load, not
-        // per fast-path check - cheap, lets us cross-reference against Creature::AddToWorld's collision
-        // log to see whether the same grid+map got loaded twice.
-        sLog.outString("[GRIDLOAD DEBUG] map %u (%p) loading grid [%u,%u]", GetId(), (void*)this, cell.GridX(), cell.GridY());
-
         ObjectGridLoader loader(*grid, this, cell);
         loader.LoadN();
 

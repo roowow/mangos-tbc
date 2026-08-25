@@ -117,9 +117,6 @@ int Master::Run()
     }
     else
     {
-        // TEMP DEBUG: log the PID even without PidFile configured, so a Server_*.log can be matched
-        // against a gdb crashdump's LWP list to confirm they're from the same process run (needed for
-        // the duplicate-guid crash investigation - see OO/Changes.md).
 #ifdef _WIN32
         sLog.outString("Process PID: %u\n", (uint32)GetCurrentProcessId());
 #else

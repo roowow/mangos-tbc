@@ -177,17 +177,6 @@ void Creature::AddToWorld()
     {
         if (IsUnit())
         {
-            // TEMP DEBUG (duplicate-guid crash investigation): only fires in the exact case that's
-            // about to hit the "Object with certain key already in but objects are different!" assert
-            // in TypeContainer.h - zero overhead in the normal (no collision) case, since it's just the
-            // same lookup insert() is about to do anyway.
-            if (Creature* existing = GetMap()->GetObjectsStore().find<Creature>(GetObjectGuid(), (Creature*)nullptr))
-            {
-                if (existing != this)
-                    sLog.outString("[GRIDLOAD DEBUG] COLLISION inserting Creature dbGuid=%u entry=%u into map %u (%p) at (%.2f,%.2f,%.2f): guid already bound to a different Creature* (existing entry=%u pos=%.2f,%.2f,%.2f)",
-                                    GetDbGuid(), GetEntry(), GetMapId(), (void*)GetMap(), GetPositionX(), GetPositionY(), GetPositionZ(),
-                                    existing->GetEntry(), existing->GetPositionX(), existing->GetPositionY(), existing->GetPositionZ());
-            }
             GetMap()->GetObjectsStore().insert<Creature>(GetObjectGuid(), (Creature*)this);
         }
         if (GetDbGuid())

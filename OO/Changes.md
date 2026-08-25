@@ -630,7 +630,7 @@ AND creature_template.name LIKE '%%%s%%' LIMIT 1;
 - 是否需要限购（比如每日购买上限），目前是不限购
 - 1金/个的定价是否合适（玩家自己提的，未做经济数据核实）
 
-**状态**：✅ 已实施到 `tbcmangosdev`，已核实生效（售价+16条商品模板记录）。`tbcmangos2` 尚未同步，用户明确要求"先实施到tbcmangosdev"，等确认后再同步生产库。
+**状态**：✅ 已实施到 `tbcmangosdev` 和 `tbcmangos2`，两库均已核实生效（售价+16条商品模板记录）。
 
 ## 2026-08-18（续）— 这6个军需官的装备本身也免荣誉点，只需牌子
 
@@ -660,3 +660,18 @@ AND creature_template.name LIKE '%%%s%%' LIMIT 1;
 **验证范围**（SQL核查）：全库搜索确认这9个ExtendedCost编号除了541/543这两套模板（对应12784/12794）外，没有再被其他 `npc_vendor`/`npc_vendor_template` 引用；修正后 12784/12794 不再受影响，只有这6个军需官会跳过荣誉点判断。
 
 **状态**：✅ 已修正，代码逻辑现在精确限定在这6个NPC。仍**尚未编译部署**，需要重新编译 `mangosd` 并重启才能生效。
+
+## 2026-08-26 — 清理"重复GUID崩溃排查"遗留的临时调试日志
+
+**背景**：日志里发现残留的 `[GRIDLOAD DEBUG]` 输出（每次地图格子加载都打一行），追查后确认是之前一次"重复GUID导致崩溃"排查遗留下的临时调试代码，`Changes.md` 里没有该次排查的记录（发生在本文档追踪范围之外），无法确认排查是否已经结束——用户确认可以清理。
+
+**清理的3处纯调试代码**（全部标注`TEMP DEBUG`）：
+1. `src/game/Maps/Map.cpp`：`LoadGrid`里每次冷加载格子都打印 `[GRIDLOAD DEBUG] map ... loading grid [...]`
+2. `src/game/Entities/Creature.cpp`（`AddToWorld`附近）：插入Creature到地图对象表前，多余的一次查重+打印碰撞日志（`[GRIDLOAD DEBUG] COLLISION inserting Creature...`），这个诊断查询除了打日志没有其他作用，整块一并删除
+3. `src/mangosd/Master.cpp`：没配置PidFile时，额外打印进程PID（方便跟崩溃dump的LWP列表比对），也是纯调试用途
+
+**保留未动的部分**：`src/game/Entities/Creature.cpp`（`AddCreatureToMoveList`/respawn附近）里那处防止"生物尸体还没清理就在同一个dbGuid上刷新导致碰撞"的**真正修复代码**（bailout逻辑，不是日志）——这不是调试代码，是那次排查后加上的实际功能修复，予以保留，只是注释里提到了那次调查作为背景说明。
+
+**是否数据库/代码改动**：代码改动（`.cpp`，纯删除，不改变任何功能逻辑，只是不再输出这几行调试日志），需要重新编译 `mangosd` 才能生效。
+
+**状态**：✅ 已清理，代码库里搜索"GRIDLOAD DEBUG"/"TEMP DEBUG"均无残留。尚未编译部署。
