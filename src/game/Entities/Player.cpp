@@ -18702,11 +18702,43 @@ void Player::InitDisplayIds()
     }
 }
 
-void Player::TakeExtendedCost(uint32 extendedCostId, uint32 count)
+// OO: 2026-08-18 - Weapon Quartermaster honor-marks catch-up. These 6 NPCs (Alliance
+// Weapon Quartermaster "Captain O'Neal" 12782/24671/26394, Horde Weapon Quartermaster
+// "Sergeant Thunderhorn" 14581/24667/26396) sell gear whose ExtendedCost still specifies
+// a Honor Points cost in ItemExtendedCost.dbc, but honor is intentionally skipped
+// server-side here so gear can be bought with marks alone (marks themselves are now
+// purchasable with gold from the same vendors) while honor itself remains obtainable
+// through normal means elsewhere. DBC data is left untouched.
+// IMPORTANT: some of these ExtendedCost IDs (e.g. 131) are ALSO reused by unrelated
+// vendors (Grand Marshal's/High Warlord's rank-14 weapons on NPCs 12784/12794) - so the
+// check must gate on the VENDOR, not just the ExtendedCost ID, or it would incorrectly
+// waive honor there too. See OO/Changes.md.
+static bool IsHonorlessQuartermasterPurchase(uint32 vendorEntry, uint32 extendedCostId)
+{
+    switch (vendorEntry)
+    {
+        case 12782: case 24671: case 26394: // Alliance Weapon Quartermaster, all 3 ranks
+        case 14581: case 24667: case 26396: // Horde Weapon Quartermaster, all 3 ranks
+            break;
+        default:
+            return false;
+    }
+
+    switch (extendedCostId)
+    {
+        case 131: case 348: case 2237: case 2238: case 2239:
+        case 2240: case 2241: case 2242: case 2271:
+            return true;
+        default:
+            return false;
+    }
+}
+
+void Player::TakeExtendedCost(uint32 extendedCostId, uint32 count, uint32 vendorEntry /*= 0*/)
 {
     ItemExtendedCostEntry const* extendedCost = sItemExtendedCostStore.LookupEntry(extendedCostId);
 
-    if (extendedCost->reqhonorpoints)
+    if (extendedCost->reqhonorpoints && !IsHonorlessQuartermasterPurchase(vendorEntry, extendedCostId))
         ModifyHonorPoints(-int32(extendedCost->reqhonorpoints * count));
     if (extendedCost->reqarenapoints)
         ModifyArenaPoints(-int32(extendedCost->reqarenapoints * count));
@@ -18798,7 +18830,7 @@ bool Player::BuyItemFromVendor(ObjectGuid vendorGuid, uint32 item, uint8 count, 
         }
 
         // honor points price
-        if (GetHonorPoints() < (iece->reqhonorpoints * count))
+        if (!IsHonorlessQuartermasterPurchase(pCreature->GetEntry(), extendedCostId) && GetHonorPoints() < (iece->reqhonorpoints * count))
         {
             SendEquipError(EQUIP_ERR_NOT_ENOUGH_HONOR_POINTS, nullptr, nullptr);
             return false;
@@ -18862,7 +18894,7 @@ bool Player::BuyItemFromVendor(ObjectGuid vendorGuid, uint32 item, uint8 count, 
         ModifyMoney(-int32(price));
 
         if (crItem->ExtendedCost)
-            TakeExtendedCost(crItem->ExtendedCost, count);
+            TakeExtendedCost(crItem->ExtendedCost, count, pCreature->GetEntry());
 
         pItem = StoreNewItem(dest, item, true);
     }
@@ -18885,7 +18917,7 @@ bool Player::BuyItemFromVendor(ObjectGuid vendorGuid, uint32 item, uint8 count, 
         ModifyMoney(-int32(price));
 
         if (crItem->ExtendedCost)
-            TakeExtendedCost(crItem->ExtendedCost, count);
+            TakeExtendedCost(crItem->ExtendedCost, count, pCreature->GetEntry());
 
         pItem = EquipNewItem(dest, item, true);
 
