@@ -3272,12 +3272,6 @@ void Spell::CheckSpellScriptTargets(SQLMultiStorage::SQLMSIteratorBounds<SpellTa
 SpellCastResult Spell::PreCastCheck(Aura* triggeredByAura /*= nullptr*/)
 {
     SpellCastResult result = CheckCast(true);
-    if (m_spellInfo->Id == 18249) // TEMP DEBUG fishing bug
-        sLog.outString("[FISHDBG] PreCastCheck spell=18249 caster=%s trueCaster=%s target=%s result=%u",
-                        m_caster ? m_caster->GetGuidStr().c_str() : "null",
-                        m_trueCaster ? m_trueCaster->GetGuidStr().c_str() : "null",
-                        m_targets.getUnitTarget() ? m_targets.getUnitTarget()->GetGuidStr().c_str() : "null",
-                        uint32(result));
     if (result != SPELL_CAST_OK && (!IsAutoRepeat() || m_triggerAutorepeat)) // always cast autorepeat dummy for triggering
     {
         if (triggeredByAura)
@@ -7415,20 +7409,11 @@ CurrentSpellTypes Spell::GetCurrentContainer() const
 
 bool Spell::CheckTarget(Unit* target, SpellEffectIndex eff, bool targetB, CheckException exception) const
 {
-    if (m_spellInfo->Id == 18249) // TEMP DEBUG fishing bug
-        sLog.outString("[FISHDBG] CheckTarget entered spell=18249 eff=%u target=%s caster=%s",
-                        uint32(eff), target ? target->GetGuidStr().c_str() : "null",
-                        m_caster ? m_caster->GetGuidStr().c_str() : "null");
-
     // Check targets for creature type mask and remove not appropriate (skip explicit self target case, maybe need other explicit targets)
     if (exception != EXCEPTION_MAGNET && m_spellInfo->EffectImplicitTargetA[eff] != TARGET_UNIT_CASTER)
     {
         if (!CheckTargetCreatureType(target, m_spellInfo))
-        {
-            if (m_spellInfo->Id == 18249) // TEMP DEBUG fishing bug
-                sLog.outString("[FISHDBG] CheckTarget REJECTED at CheckTargetCreatureType");
             return false;
-        }
     }
 
     WorldObject* affectiveCaster = GetAffectiveCaster();

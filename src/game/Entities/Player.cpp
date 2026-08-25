@@ -13457,11 +13457,6 @@ void Player::RewardQuest(Quest const* pQuest, uint32 reward, Object* questGiver,
                 }
             }
 
-            if (spellId == 18249) // TEMP DEBUG fishing bug
-                sLog.outString("[FISHDBG] RewardQuest casting spell=%u caster=%s (questGiver=%s, player=%s) target=%s",
-                                spellId, caster->GetGuidStr().c_str(), questGiver->GetGuidStr().c_str(),
-                                GetGuidStr().c_str(), GetGuidStr().c_str());
-
             caster->CastSpell(this, spellProto, TRIGGERED_OLD_TRIGGERED);
         }
     }

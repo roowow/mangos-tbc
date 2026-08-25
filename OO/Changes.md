@@ -588,3 +588,20 @@ AND creature_template.name LIKE '%%%s%%' LIMIT 1;
 2. **安全边界**：给搜索关键字加最短长度限制（少于3个字符直接拒绝并提示，不发起查询）——关键字太短会匹配`creature_template.name`里很大比例的行，是最容易触发慢查询的情况。
 
 **状态**：✅ 代码已改（[Level2.cpp](src/game/Chat/Level2.cpp)），需重新编译部署。这条查询本身依然是同步执行在主线程上，只是优化后大幅降低了跑慢的概率，没有从架构上根治"GM命令同步查数据库可能卡主线程"这一类问题，后续如果还有类似的GM命令卡死崩溃，需要考虑把这类查询整体改成异步。
+
+## 2026-08-24 — 排查"钓鱼225任务BUG"：结论为GM测试假象，非真实bug
+
+**玩家反馈**：钓鱼225任务提交后没有给任务品，且熟练度未到300（任务6607"Nat Pagle, Angler Extreme"，纳特·帕格）。
+
+**排查过程**：
+1. "没给任务品"——核实任务6607设计上本来就没有物品奖励（所有RewItemId/RewChoiceItemId字段均为0），奖励只是学会法术18248（提升钓鱼熟练度上限至300）。不是bug，是玩家对奖励形式的误解。
+2. "熟练度未到300"——追了完整代码链路：`RewardQuest`选择施法者（因法术18249含`SPELL_EFFECT_LEARN_SPELL`，触发"施法者换成任务NPC"逻辑，纳特·帕格代替玩家施法）→ `PreCastCheck`/`CheckCast`→`CheckTarget`→`EffectLearnSpell`→`learnSpell(18248)`→`UpdateSpellTrainedSkills`→`SetSkillStep(356,4)`→读DBC(`SkillTiers`/`SkillRaceClassInfo`)得到上限300。
+3. 用GM账号测试（`.unlearn 18248` + `.setskill 356 225 225` + 正常交任务），复现"熟练度不变"。加了临时调试日志（`RewardQuest`/`PreCastCheck`/`CheckTarget`/`EffectLearnSpell`四处，均已清理）实机重测，定位到`CheckTarget`把目标过滤掉了（`EffectLearnSpell`从未被进入）。
+4. 怀疑是`CheckTarget`里的GM保护逻辑（`Spell.cpp` ~7446行：`if (target->IsGameMaster() && !IsPositiveEffect(...)) return false;`）在"施法者是NPC、效果是学法术"这种不常见组合下，把这个效果误判成"非正面"，从而拦截了目标玩家（GM身份专属保护，不影响普通玩家）。
+5. **验证**：关闭GM模式（`.gm off`）后重新走完整流程，日志显示`EffectLearnSpell`正常进入，`unitTargetIsPlayer=1`，技能正确提升到300。
+
+**结论**：不是真bug。测试时角色处于GM模式，被GM保护逻辑误拦截；正常玩家（非GM）不会触发这个分支，任务奖励发放和技能上限提升机制本身完全正常。
+
+**遗留观察（不在本次修复范围）**：`IsPositiveEffect`对"由NPC代为施放的学法术效果"判断是否准确，理论上可能是一个更底层、影响面未知的小问题（GM测试专属场景下才会暴露），但没有证据表明这会影响任何真实玩家场景，本次不做改动，仅记录留痕。
+
+**状态**：✅ 已排查清楚，确认非bug，无需修复。临时调试日志（4处，`RewardQuest`/`PreCastCheck`/`CheckTarget`/`EffectLearnSpell`）已全部移除。
