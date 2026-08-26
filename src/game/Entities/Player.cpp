@@ -11205,7 +11205,7 @@ void Player::SplitItem(uint16 src, uint16 dst, uint32 count)
         pSrcItem->SetCount(pSrcItem->GetCount() - count);
 
         ItemPosCountVec dest;
-        uint8 bagSlot;
+        uint8 bagSlot = 0;
         InventoryResult msg = CanBankItem(dstbag, dstslot, dest, pNewItem, false, bagSlot);
         if (msg != EQUIP_ERR_OK)
         {
@@ -11333,7 +11333,7 @@ void Player::SwapItem(uint16 src, uint16 dst)
         else if (IsBankPos(dst))
         {
             ItemPosCountVec dest;
-            uint8 bagSlot;
+            uint8 bagSlot = 0;
             InventoryResult msg = CanBankItem(dstbag, dstslot, dest, pSrcItem, false, bagSlot);
             if (msg != EQUIP_ERR_OK)
             {
@@ -11368,7 +11368,7 @@ void Player::SwapItem(uint16 src, uint16 dst)
         InventoryResult msg;
         ItemPosCountVec sDest;
         uint16 eDest = 0;
-        uint8 bagSlot;
+        uint8 bagSlot = 0;
         if (IsInventoryPos(dst))
             msg = CanStoreItem(dstbag, dstslot, sDest, pSrcItem, bagSlot, false);
         else if (IsBankPos(dst))
@@ -15915,7 +15915,7 @@ void Player::_LoadInventory(std::unique_ptr<QueryResult> queryResult, uint32 tim
                 else if (IsBankPos(INVENTORY_SLOT_BAG_0, slot))
                 {
                     ItemPosCountVec dest;
-                    uint8 bagSlot;
+                    uint8 bagSlot = 0;
                     if (CanBankItem(INVENTORY_SLOT_BAG_0, slot, dest, item, false, bagSlot, false) == EQUIP_ERR_OK)
                         item = BankItem(dest, item, true);
                     else
@@ -21080,7 +21080,7 @@ Item* Player::ConvertItem(Item* item, uint32 newItemId)
     else if (IsBankPos(pos))
     {
         ItemPosCountVec dest;
-        uint8 bagSlot;
+        uint8 bagSlot = 0;
         InventoryResult msg = CanBankItem(item->GetBagSlot(), item->GetSlot(), dest, pNewItem, true, bagSlot);
         // ignore cast/combat time restriction
         if (msg == EQUIP_ERR_OK)
