@@ -335,7 +335,7 @@ if (map && map->IsDungeon() && !map->IsRaid())
 | 3 | `5c9580a64` | 逃生传送门法术(46841)标记为 TRIGGERED（配套#2，抓包比对） | 纯触发方式修正，低风险 | ✅ 已实施 |
 | 4 | `ff681a044` | `CheckTarget` 对纯 `TARGET_FLAG_UNIT` 目标跳过友敌校验 | 核心引擎级改动，作者自述半成品（ALLY/ENEMY标记未处理），影响面广 | ⏭️ 跳过，待更多证据 |
 | 5 | `ea90dbcb1` | 斯坦索姆 Maleki the Pallid"冰封墓穴"命中清空目标仇恨 | 单一5人本BOSS机制，低风险 | ✅ 已 cherry-pick（`4ff66b28d`），待编译部署 |
-| 6 | `2d9e0e24a` | 地狱火脓水沼泽 Hungarfen 孢子云DoT误伤自己（可能被bug秒杀）+缩小技能漏施放 | 单一5人本BOSS核心机制修复，价值较高；需代码+`spell_scripts`绑定两步 | ⏸️ 待确认，尚未实施 |
+| 6 | `2d9e0e24a` | 地狱火脓水沼泽 Hungarfen 孢子云DoT误伤自己（可能被bug秒杀）+缩小技能漏施放 | 单一5人本BOSS核心机制修复，价值较高；需代码+`spell_scripts`绑定两步 | ✅ 已 cherry-pick（`66e9f31aa`），`spell_scripts`(34168,'spell_spore_cloud_underbog') 已在 `tbcmangosdev`+`tbcmangos2` 执行并核实，待编译部署 |
 | 7 | `aa39545ce` | 怪物"说话"广播范围按可见距离(AOI)比例放大 | 纯客户端体验层，无副作用，低风险 | ✅ 已 cherry-pick（`7279de930`），待编译部署 |
 | 8 | `10b579ceb` | 补充缺失的 spell_template 数据行：32432 "Full Heal / Mana"（纯数值，无对应 Effect 类型异常） | 纯附加 INSERT，但当前 Nmangos-tbc 代码/DB 均无处引用该 ID，没有实际用途 | ⏭️ 用户判断没必要实施，已撤销（revert 提交 `e933a8b47`，`tbcmangosdev` 已删除对应行并核实） |
 | 9 | `55782dc5b` | 邮件到达提醒弹窗最多显示 2 封→3 封 | 纯客户端展示，低风险 | ✅ 已 cherry-pick（`b7a3ef146`） |
@@ -367,7 +367,7 @@ if (map && map->IsDungeon() && !map->IsRaid())
 | 25 | `dbaa657da` | 补齐13个文件、77处"字段偏移量+枚举值"运算的显式 `static_cast`，消除编译警告（#634） | 抽查多个改动量最大的文件，全部数值等价的显式转型，无实际运算逻辑改变；跟已合并的 #22 同一类改动，只是规模更大 | ✅ 已 cherry-pick（`6bb166cef`） |
 | 26 | `df76f6908` | 艾拉隘口战场 `BattleGroundAV.cpp` 一行：摧毁塔楼奖励声望的三元表达式两个分支都写成暴风大军（复制粘贴错误），修正部落分支为冬狼氏族 | 单行改动，逻辑清晰，真实游戏bug（部落摧毁塔楼被错误奖励联盟阵营声望），只影响AV声望奖励 | ✅ 已 cherry-pick（`91f696a7a`） |
 | 27 | `0f557959c` | `WorldSession::Update()` 会话复用分支绕过了排队检查，且漏发 `SendClientCacheVersion`/`SendTutorialsData` 两个握手包，导致客户端在会话复用场景下崩溃；统一两个分支的排队逻辑并补发遗漏的包 | 触碰核心登录/会话流程，影响面是全部玩家，但改动本身收窄清晰（统一分支+补发遗漏包，非新增逻辑）；`SendTutorialsData` 幂等，重复调用无副作用 | ✅ 已 cherry-pick（`885133550`） |
-| 28 | `28ef97c3a` | 猎人天赋"精良宠物治疗"(19572/19573)从旧的硬编码 `case 4086/4087` 迁移到新的 `spell_scripts` 脚本系统，逻辑等价，但需要配套SQL（`spell_scripts` 新增2行绑定），且代码侧已删除旧逻辑，SQL不跑天赋就会失效 | 涉及DB且新旧逻辑非兼容并存（必须代码+SQL同时生效） | ⏸️ 用户选择暂不合并 |
+| 28 | `28ef97c3a` | 猎人天赋"精良宠物治疗"(19572/19573)从旧的硬编码 `case 4086/4087` 迁移到新的 `spell_scripts` 脚本系统，逻辑等价，但需要配套SQL（`spell_scripts` 新增2行绑定），且代码侧已删除旧逻辑，SQL不跑天赋就会失效 | 涉及DB且新旧逻辑非兼容并存（必须代码+SQL同时生效） | ✅ 2026-08-26 重新确认后实施：已 cherry-pick（`796a7d895`），`spell_scripts`(19572/19573,'spell_improved_mend_pet') 已在 `tbcmangosdev`+`tbcmangos2` 执行并核实（代码+SQL同批次生效，规避了原先"暂不合并"顾虑的那个风险点）。（注：本条曾被误标记状态，已于同日更正） |
 | 29 | `d48be200e` | 卡拉赞策展者(Curator)"星界耀斑"召唤物追击玩家的仇恨值，`100001.f` → `1000.f` | 单行改动，改动范围极窄（只影响这一个boss召唤物的仇恨机制），具体原始bug表现未完全查证到根源，但爆炸半径小 | ✅ 已 cherry-pick（`b06b4d4f2`） |
 | 30 | `43162a9da` | `Spell::EffectPowerBurn` 删除一行人为拼凑的战斗日志（原注释自述"客户端没实现POWER_BURN显示"的workaround），作者基于抓包证据确认真实协议不发这条日志 | 纯删除，不影响实际伤害/效果，只影响法力灼烧类法术的战斗记录显示细节 | ✅ 已 cherry-pick（`1f9c81b0d`） |
 | 31 | `c55d84514` | 黑色圣殿"遗物之魂"boss战"灵魂尖啸"(41545)命中后清空目标怒气，作者自述是"hack"（伤害结算与怒气生成顺序问题的临时补丁），需要配套SQL新增 `spell_scripts` 绑定 | 范围极窄（单boss单技能），作者自认是workaround非通用修复 | ⏸️ 用户选择暂不合并 |
@@ -403,6 +403,36 @@ if (map && map->IsDungeon() && !map->IsRaid())
 | — | `3c8121d3d` | 修正 `29f7fc0d3`（我们已合并）里"战斗中开箱"检查极性写反的bug：`IsUsableInCombat()`返回true=允许战斗中用，原判断写成"允许用且在战斗中→拒绝"正好相反，补`!`修正 | 单字符修复，逻辑清楚，直接修正我们自己刚合并的bug | ✅ 已 cherry-pick（`171886c45`） |
 
 | — | `9ea7c43ef` | `MoveSplineInitArgs::Validate()` 的 `CHECK` 宏验证失败时记日志直接解引用 `unit`，但某些路径（"循环样条延续"）unit可以是空指针，导致记录错误日志本身崩溃；加判空处理 | 纯防御性判空，只在已出错路径生效，不影响正常流程；关联真实上游issue | ✅ 已 cherry-pick（`394d9a4b9`） |
+
+| — | `879e07576` | 黑色圣殿"潮汐爆发"(39878) `AttributesEx5` 加 `SPELL_ATTR_EX5_NO_PARTIAL_RESISTS`(0x00800000)：伤害不可被部分抵抗，但仍可被闪避/未命中 | 单行DBC数据修正，单boss单技能，该spell在`cmangos_fixes/Spell.sql`已有另一条独立属性修正（`AttributesEx4`），两者不冲突 | ✅ 已 cherry-pick（`deaf3d5df`，与已撤销的#8"Full Heal/Mana"INSERT相邻产生文本冲突，解决时保留HEAD不恢复该INSERT），`tbcmangosdev`+`tbcmangos2` 均已执行UPDATE并核实（`AttributesEx5`: 0→8388608） |
+
+| — | `57bfc8e87` | 沙塔斯四种阵营声望药水(41608-41611)从共用的 `spell_ogrila_flasks` 脚本拆成独立的 `spell_shattrath_flasks`；核对`spell_template`结构与奥格瑞拉药水完全一致（APPLY_AURA+TRIGGER_SPELL），新脚本"主光环消失时移除触发出的子光环"逻辑与旧脚本功能等价，只是代码组织上按阵营拆分命名 | 纯代码组织拆分，不改变任何实际游戏表现 | ✅ 已 cherry-pick（`2038db0cb`，与已跳过的`c55d84514`"spell_soul_scream"行相邻产生文本冲突，解决时不引入该行），`tbcmangosdev`+`tbcmangos2` 均已把这4条`spell_scripts`绑定从`spell_ogrila_flasks`改成`spell_shattrath_flasks`并核实 |
+
+| — | `8aaa886c5` + `00396c615` | Playerbot 模组：支持自定义playerbot配置文件路径 + 修正头文件include路径大小写 | 两条改动全部包在 `#ifdef ENABLE_PLAYERBOTS`/`BUILD_DEPRECATED_PLAYERBOT` 内；核对`cmake/options.cmake`确认`BUILD_PLAYERBOTS`默认`OFF`且我们从未开启过，对我们是完全不参与编译的死代码 | ✅ 已 cherry-pick（`b04ad3355`+`b54b81539`），零编译影响 |
+
+| — | `0c79f9dcd` | 关联官方issue #4051：`Pet::UpdateMaxHealth()` 耐力转生命值公式 `max((stamina-20)*10+20, 0)` 写错——耐力加成在0~20区间时整个表达式为负被砍成0，等于这段耐力完全不转化生命值；改成正确的分段公式 `max((stamina-20)*10,0) + min(20,stamina)`（前20点1:1，超出部分10:1） | 单函数修复，真实公式bug，影响所有耐力加成不超过20点的宠物（猎人/术士等，尤其升级阶段） | ✅ 已 cherry-pick（`707563d12`），纯C++改动无需DB同步，待编译部署 |
+
+| — | `833ab56f4` | 关联官方PR#628：武器/防御技能升级概率整体重写。真实bug部分：`UpdateCombatSkills`算完一次概率后，调用的`UpdateSkill`/`UpdateDefense`内部还有第二道随机门槛(`value*512 < max*urand(0,512))`)，概率被平白打两次折；重写后去掉这层。但同时把整个概率公式换成新的分段曲线（对数追赶+二次衰减+等级/智力归一化），常数未对照真实怀旧服数据验证，纯靠作者自己模拟 | 查了PR讨论区：官方审核者`bdebaere`当场指出新公式会让低等级角色技能涨过快（"1级角色100%概率"），作者承认"矫枉过正"但**最终合并时并未回去调整**——这是官方自己都留有已知平衡性疑虑、未最终验证的改动，会影响所有玩家的技能升级速度 | ⏸️ 暂不合并，等官方后续调整或我们自己验证后再决定 |
+
+| — | `15d882a31` | 紧接#833ab56f4的后续微调：调整同一套公式里的等级封顶归一化系数和智力加成分档逻辑，新增两条作者自留TODO（"不确定vanilla/tbc/wotlk的295→300封顶是否一致"、"智力加成实际曲线大概率不是线性的，待确认"） | 改动的是父提交(`833ab56f4`)引入的同一个函数，父提交已跳过，这条本身也无法独立应用；TODO进一步印证该公式尚未定稿 | ⏭️ 随父提交一并跳过 |
+
+| — | `e31654e1e` | 关联官方issue #2822：`Unit::MeleeDamageBonusDone` 非武器基础伤害法术的百分比加成光环校验，第二个条件原本写成"匹配武器自身近战伤害学派"（`GetMeleeDamageSchoolMask`），导致圣洁光环(神圈%加成)在普通（非神圈附魔）武器上无法加成正义之印神圈伤害；改成校验"法术自身学派"，与函数里固定值加成那段的校验方式统一 | 单函数单循环，范围窄，有官方issue佐证，真实学派校验bug | ✅ 已 cherry-pick（`79146fc88`），纯C++改动无需DB同步，待编译部署 |
+
+| — | `27689e8c3` | "医生"世界事件（南希尔/塔伦米尔包扎伤员）召唤的伤员NPC死亡后消失方式从"立即消失"改成"脱战或死亡5秒后消失"，还原原版观感 | 单行纯视觉层改动，不影响任务判定逻辑 | ✅ 已 cherry-pick（`277970bc3`） |
+
+| — | `28d61c962` | 海加尔山"末日之火"(31944)伤害衰减公式从"按剩余持续时间比例算"（除法易截断误差）改成"按已过tick数直接算"，逻辑等价；顺带把触发伤害`CastCustomSpell`的目标参数从`triggerTarget`改成`nullptr`（该伤害法术31969本身是范围隐式目标，参数本就没被实际使用） | 单个case分支窄改动，commit说明是补上遗漏的已知修复（非新发明公式），与已处理的#37同属Anetheron/Hyjal机制 | ✅ 已 cherry-pick（`534c3f85c`） |
+
+| — | `add48d318` | 给3个 `SpellScript` 结构体（海加尔Anetheron沉睡、复活死者、沙塔斯"恶魔烤肉惊喜"）补上"技能ID-技能名"说明注释 | 纯注释，零行为改变 | ✅ 已 cherry-pick（`da79dd558`） |
+
+| — | `ff6d5bb02` | `Spell::SetTargetMap` 一处有意穿透的 switch case 补上 `[[fallthrough]]` 属性标注（旁边本来就有注释说明穿透是故意的） | 纯编译器警告标注，零行为改变 | ✅ 已 cherry-pick（`fed989461`） |
+
+| — | `3e69c84c9` | 黑色圣殿至尊者(Supremus)：坦克阶段结束后切换Fixate目标从"瞬间触发"改成8秒延迟；`DisableTimer`+`SetActionReadyStatus`两行合并成等价封装`DisableCombatAction`（核对实现一致）；一处纯改名(`SPELL_SLOW_SELF`→`SPELL_SNARE_SELF`，ID不变)+两处纯注释 | 单boss机制时机调整，风险低 | ✅ 已 cherry-pick（`3820865f1`） |
+
+| — | `e884ece9b` | 黑色圣殿伊利丹议会 Gathios（与已实施的#35/#36"审判消耗圣印"同一boss）：光环选择(`m_aura`，奉献/五彩)从每次纯随机重roll改成和圣印选择一样的"固定交替+开局随机初始值"模式；圣印选择(`m_seal`)本身交替逻辑不变，只是初始值从固定`false`改成开局随机 | 单boss单文件AI逻辑微调，与已验证的圣印机制同一思路 | ✅ 已 cherry-pick（`11ae87205`） |
+
+| — | `bac14b6f4` | 关联官方issue #4120：给`Unit::SendMessageToAllWhoSeeMeMove`补一个遗漏分支——"我"是玩家且被别的实体操控(`moverOwner != GetObjectGuid()`，即被魅惑/操纵)时，直接给自己客户端补发移动包 | 该函数正是之前"飞行卡死"事故(`3098491fd`/`1076c2cd8`)引入、已被我们整体revert(`e3dc1ea3e`)撤销的机制，我们代码库里当前**没有这个函数**，无法独立应用。核对确认这条修的是"被魅惑/操控玩家收不到包"，与我们撤销的"飞行开始瞬间自己未注册进可见者列表"是不同的两个缺口，重新引入不会顺带解决我们的问题 | ⏭️ 暂不处理（依赖已撤销的父提交），记录备查 |
+
+| — | `e5d500f73` | "物品放不进背包"客户端报错补上具体槽位号（新增`bagSlot`输出参数，一路穿透`_CanStoreItem_InSpecificSlot`→`_CanStoreItem_InBag`→`_CanStoreItem`→`CanStoreItem`/`CanBankItem`→`SendEquipError`），对齐官方协议；存放判断逻辑本身不变，纯客户端提示精确度提升 | 改动横跨10个文件、贯穿几乎所有"能否放入背包"调用点，但核心逻辑等价；发现官方原始提交里`SplitItem`/`SwapItem`/`_LoadInventory`/`ConvertItem`共5处新增的`uint8 bagSlot`局部变量未初始化（其余十几处都写了`=0`），补上初始化避免未定义栈值被当槽位号发进网络包（与之前`SpellCastArgs`那次是同一类问题，但这次影响面只是报错提示里的一个字节，无实际危害） | ✅ 已 cherry-pick（`fb6485cce`）+ 补充初始化修复（`1161c409c`），待编译部署 |
 
 | — | `3fa107236` | 给对话辅助结构体新增 `type`（ACTION/TEXT，默认ACTION）字段，"直接指定说话者+文本"分支改成要求`type==DIALOGUE_STEP_TEXT`才触发；查了origin/master全部历史，`DIALOGUE_STEP_TEXT`没有任何脚本文件实际设置过，等于静默关闭这个现有机制，看起来是没配套完成数据标注的半成品重构 | 单独合并会静默禁用全部依赖此分支的现有boss对话/喊话脚本 | ⏸️ 用户选择暂不合并，等后续配套提交出现再处理 |
 
