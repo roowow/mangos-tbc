@@ -1140,6 +1140,9 @@ SpellSchoolMask UnitAI::GetMainAttackSchoolMask() const
 
 bool UnitAI::IsMainSpellPrevented(SpellEntry const* spellInfo) const
 {
+    if (!spellInfo)
+        return false;
+
     if (!m_unit->IsSpellReady(*spellInfo))
         return true;
 

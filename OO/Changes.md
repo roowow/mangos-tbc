@@ -691,6 +691,18 @@ AND creature_template.name LIKE '%%%s%%' LIMIT 1;
 
 **状态**：✅ 已修正，代码逻辑现在精确限定在这6个NPC。仍**尚未编译部署**，需要重新编译 `mangosd` 并重启才能生效。
 
+## 2026-09-02 — 崩溃排查：`UnitAI::IsMainSpellPrevented` 空指针解引用（crash0902.txt）
+
+**现象**：`SIGSEGV`，主世界线程（`MapUpdateWorker`）崩溃，栈顶 `WorldObject::IsSpellReady` 访问 `spellEntry.Category` 段错误。
+
+**根因**：`UnitAI::IsMainSpellPrevented(SpellEntry const* spellInfo)`（`UnitAI.cpp:1143`）没有判空直接 `*spellInfo` 解引用。触发路径是 `UnitAI::UpdateAI` 远程模式逻辑（`TYPE_PROXIMITY`/`TYPE_DISTANCER`）：`IsEligibleForDistancing() && !IsMainSpellPrevented(m_mainSpellInfo)`——`IsEligibleForDistancing()` 对非法力系生物（怒气/能量等）直接返回`true`，不检查`m_mainSpellInfo`是否为空（只有法力系分支才判空），导致"远程模式+非法力系+没有主法术"的生物会用空指针调用该函数崩溃。
+
+**修复**：`IsMainSpellPrevented` 开头补上 `if (!spellInfo) return false;`（没有主法术=没有被阻止，语义自然）。
+
+修改文件：`src/game/AI/BaseAI/UnitAI.cpp`。
+
+**状态**：✅ 代码已改，待编译部署验证。
+
 ## 2026-08-26 — 清理"重复GUID崩溃排查"遗留的临时调试日志
 
 **背景**：日志里发现残留的 `[GRIDLOAD DEBUG]` 输出（每次地图格子加载都打一行），追查后确认是之前一次"重复GUID导致崩溃"排查遗留下的临时调试代码，`Changes.md` 里没有该次排查的记录（发生在本文档追踪范围之外），无法确认排查是否已经结束——用户确认可以清理。
