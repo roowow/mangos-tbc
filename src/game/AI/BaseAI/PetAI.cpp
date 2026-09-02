@@ -301,6 +301,8 @@ std::vector<std::tuple<SpellEntry const*, Unit*, bool>> PetAI::PickSpellWithTarg
             continue;
 
         SpellEntry const* spellInfo = sSpellTemplate.LookupEntry<SpellEntry>(spellId);
+        if (!spellInfo)
+            continue;
 
         PetAutocastSpellList* spellList = m_creature->GetMap()->GetMapDataContainer().GetPetAutocastSpellList(creatureEntry, spellId);
 

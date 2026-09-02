@@ -707,6 +707,9 @@ Unit* UnitAI::DoSelectConditionalFriendly(float range, int32 unitConditionId) co
 
 float UnitAI::CalculateSpellRange(SpellEntry const* spellInfo) const
 {
+    if (!spellInfo)
+        return 0.f;
+
     // optimized duplicate of Spell::GetMinMaxRange for just max range
     SpellRangeEntry const* spellRange = sSpellRangeStore.LookupEntry(spellInfo->rangeIndex);
     float maxRange = GetSpellMaxRange(spellRange);
@@ -722,6 +725,9 @@ CreatureList UnitAI::DoFindFriendlyEligibleDispel(uint32 spellId, bool self) con
 
 CreatureList UnitAI::DoFindFriendlyEligibleDispel(SpellEntry const* spellInfo, bool self) const
 {
+    if (!spellInfo)
+        return {};
+
     uint32 dispelMask = 0;
     uint32 mechanicMask = 0;
     for (uint32 i = 0; i < MAX_EFFECT_INDEX; ++i)
@@ -743,6 +749,9 @@ CreatureList UnitAI::DoFindFriendlyMissingBuff(float /*range*/, uint32 spellId, 
 CreatureList UnitAI::DoFindFriendlyMissingBuff(SpellEntry const* spellInfo, bool inCombat, bool self, uint32 spawnGroupId) const
 {
     CreatureList list;
+    if (!spellInfo)
+        return list;
+
     float maxRange = CalculateSpellRange(spellInfo);
     if (inCombat == false)
     {
@@ -1223,6 +1232,8 @@ void UnitAI::UpdateSpellLists()
         if (spell.CombatCondition != -1 && spell.CombatCondition)
         {
             SpellEntry const* spellInfo = sSpellTemplate.LookupEntry<SpellEntry>(spell.SpellId);
+            if (!spellInfo)
+                continue;
             float maxRange = CalculateSpellRange(spellInfo);
             if (!sObjectMgr.IsCombatConditionSatisfied(spell.CombatCondition, m_unit, maxRange))
                 continue;

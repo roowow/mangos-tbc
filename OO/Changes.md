@@ -703,6 +703,17 @@ AND creature_template.name LIKE '%%%s%%' LIMIT 1;
 
 **状态**：✅ 代码已改，待编译部署验证。
 
+**排查同类问题**：应用户要求，检查了代码库里所有"从DB驱动的spell_scripts/spell_list数据查spellId、拿到SpellEntry后直接解引用"的同类模式，额外发现并修复4处同样会因坏/失效spellId崩溃的隐患（此前从未真正触发过，纯预防性加固）：
+- `UnitAI::CalculateSpellRange`（UnitAI.cpp:708）：直接读`spellInfo->rangeIndex`，加判空返回0.f——这是多处调用共用的底层函数，加固一次覆盖了它所有调用者。
+- `UnitAI::DoFindFriendlyEligibleDispel(SpellEntry const*, bool)`（UnitAI.cpp:723）：直接读`spellInfo->Effect[i]`，加判空返回空列表。
+- `UnitAI::DoFindFriendlyMissingBuff(SpellEntry const*, ...)`（UnitAI.cpp:743）：同上模式，加判空返回空列表。
+- `PetAI::PickSpellWithTarget`宠物自动施法循环（PetAI.cpp:303）：查出的`spellInfo`在被`spellList`分支使用（`CalculateSpellRange`/`CanAutoCastAreaAura`）之前完全没判空，只在分支外才判——DB里配了失效/被删除的宠物自动施法技能ID就会崩，把判空提前到查完立即做。
+- `UnitAI::UpdateSpellLists()`的`CreatureSpellList`战斗条件检查（原UnitAI.cpp:1231附近）：同样模式，补了一处判空双重保险（与`CalculateSpellRange`自身加固形成防御纵深）。
+
+其余十几处`IsSpellReady(*ptr)`/类似解引用用法（`PetHandler.cpp`、`Player.cpp`、`Spell.cpp`、`SpellHandler.cpp`、`TotemAI.cpp`、`Rogue.cpp`脚本、`Object.cpp`等）逐个核对，均已有判空保护或来自天生非空的成员（如`Spell::m_spellInfo`构造不变式），未做改动。
+
+修改文件：`src/game/AI/BaseAI/UnitAI.cpp`、`src/game/AI/BaseAI/PetAI.cpp`。
+
 ## 2026-08-26 — 清理"重复GUID崩溃排查"遗留的临时调试日志
 
 **背景**：日志里发现残留的 `[GRIDLOAD DEBUG]` 输出（每次地图格子加载都打一行），追查后确认是之前一次"重复GUID导致崩溃"排查遗留下的临时调试代码，`Changes.md` 里没有该次排查的记录（发生在本文档追踪范围之外），无法确认排查是否已经结束——用户确认可以清理。
