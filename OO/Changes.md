@@ -434,6 +434,8 @@ if (map && map->IsDungeon() && !map->IsRaid())
 
 | — | `e5d500f73` | "物品放不进背包"客户端报错补上具体槽位号（新增`bagSlot`输出参数，一路穿透`_CanStoreItem_InSpecificSlot`→`_CanStoreItem_InBag`→`_CanStoreItem`→`CanStoreItem`/`CanBankItem`→`SendEquipError`），对齐官方协议；存放判断逻辑本身不变，纯客户端提示精确度提升 | 改动横跨10个文件、贯穿几乎所有"能否放入背包"调用点，但核心逻辑等价；发现官方原始提交里`SplitItem`/`SwapItem`/`_LoadInventory`/`ConvertItem`共5处新增的`uint8 bagSlot`局部变量未初始化（其余十几处都写了`=0`），补上初始化避免未定义栈值被当槽位号发进网络包（与之前`SpellCastArgs`那次是同一类问题，但这次影响面只是报错提示里的一个字节，无实际危害） | ✅ 已 cherry-pick（`fb6485cce`）+ 补充初始化修复（`1161c409c`），待编译部署 |
 
+**追加排查（2026-09-02）**：全仓库排查 `SendEquipError` 全部调用点，发现 `e5d500f73` 签名改动（`uint32 itemid`→`uint8 slot, uint32 itemid = 0`，itemid 从第4位挪到第5位）漏改了7处调用——这7处原本把"物品ID"当第4个参数传（对应旧签名的`itemid`），现在被新加的`slot`参数吃掉，物品ID被截断/丢弃，`itemid`参数缺省变0，导致对应报错场景里"需求等级不足"提示会显示错误的物品信息。同样确认这7处在`origin/master`当前状态里也是漏改的，不是我们cherry-pick引入的。补齐`0, `使物品ID正确落到`itemid`参数：`Player.cpp`（`StoreNewItemInInventorySlot`/`SetAmmo`/`CanGiveQuestSourceItemIfNeed`/`TakeQuestSourceItem`各1处，共4处）、`Chat/Level3.cpp`、`Entities/PetitionsHandler.cpp`、`Loot/LootMgr.cpp`（另有一处该文件里同类调用已在原cherry-pick中正确修复）。
+
 | — | `3fa107236` | 给对话辅助结构体新增 `type`（ACTION/TEXT，默认ACTION）字段，"直接指定说话者+文本"分支改成要求`type==DIALOGUE_STEP_TEXT`才触发；查了origin/master全部历史，`DIALOGUE_STEP_TEXT`没有任何脚本文件实际设置过，等于静默关闭这个现有机制，看起来是没配套完成数据标注的半成品重构 | 单独合并会静默禁用全部依赖此分支的现有boss对话/喊话脚本 | ⏸️ 用户选择暂不合并，等后续配套提交出现再处理 |
 
 | — | `a3f4bc370` | `boost/bind.hpp` 换成新的 `boost/bind/bind.hpp`，配合`using namespace boost::placeholders;`，消除Boost弃用警告 | 纯编译期头文件调整，不影响运行时行为 | ✅ 已 cherry-pick（`44fc3db10`） |
@@ -702,6 +704,23 @@ AND creature_template.name LIKE '%%%s%%' LIMIT 1;
 修改文件：`src/game/AI/BaseAI/UnitAI.cpp`。
 
 **状态**：✅ 代码已改，待编译部署验证。
+
+## 2026-09-02 — 玩法反馈：专业技能"遗忘后重新学"，练满级接不到分支/专精任务
+
+**现象**（玩家反馈，部落术士）：裁缝遗忘后重新学，冲到325级，接不了分支任务。用户补充：锻造之前也出现过同样问题，当时是靠"取消任务"解决的。
+
+**根因**：查DB确认裁缝325级分支任务（10831/10832/10833"成为月布/秘银/暗影编织裁缝"，三选一互斥`ExclusiveGroup`）的`quest_template.RequiredSkill`就设的是裁缝(197)。玩家大概率在遗忘裁缝之前已经接了这三个任务中的一个但没交；`Player::SetSkill`的"移除技能"分支（技能遗忘走这里）只清空技能值+联动卸载配方法术，完全不碰任务日志——那份任务就一直挂在日志里（配方技能都没了，没法完成），也挡住重新达到325级后再接同一互斥组的任务。锻造那次是同一根因，"取消任务"手动清掉了卡住的那份任务所以能重接。
+
+**修复**：`Player::SetSkill`移除技能分支末尾新增调用`AbandonQuestsRequiringSkill(id)`，扫描任务日志、自动放弃`RequiredSkill`等于被遗忘技能的在做任务，从根源避免"重学后被自己以前没交的任务卡住接不了新任务"。具体实现：
+- 新增`Player::AbandonQuestInSlot(uint16 slot, bool sendMsg = true)`：把原来`WorldSession::HandleQuestLogRemoveQuest`(`QuestHandler.cpp`)里手写的"放弃任务"逻辑（计时任务清理、任务绑定物品销毁、`SetQuestStatus(NONE)`、清空任务槽）抽成共享方法，客户端手动放弃任务的入口现在也改为调用它（行为完全等价，纯提取复用，不再各自维护一份）。
+- 新增`Player::AbandonQuestsRequiringSkill(uint32 skillId)`：遍历任务日志25个槽位，`RequiredSkill`匹配则调用`AbandonQuestInSlot(slot, false)`（静默，不给玩家弹装备错误提示，因为这是遗忘技能触发的后台清理，不是玩家主动操作）。
+- 核对了`SetSkill(id,0,0)`的另外几个调用点（`_LoadSpells`级联的`UpdateSkillTrainedSpells`，且专业技能被显式排除在那条路径外）不会有副作用；`_LoadSkills`/`_LoadSpells`都在`_LoadQuestStatus`之前跑，即便巧合触发也只是读到任务槽全0的无害空跑。
+
+修改文件：`src/game/Entities/Player.h`、`src/game/Entities/Player.cpp`、`src/game/Quests/QuestHandler.cpp`。
+
+**顺带修复**：排查`SendEquipError`调用点时，发现6处（`Player.cpp`两处、`Chat/Level3.cpp`、`Entities/PetitionsHandler.cpp`、`Loot/LootMgr.cpp`）在`e5d500f73`改签名（新增`slot`参数插在`itemid`前面）时被漏改——把物品ID当第4个参数传，现在被`slot`吃掉截断，`itemid`参数缺省变0；确认`origin/master`自己也是这样，不是我们引入的。已按正确参数顺序补上`0, `。
+
+**状态**：✅ 代码已改，待编译部署验证（建议找一个测试号复现"接分支任务不交→遗忘专业→重学练满→再接"这条链路，确认卡住的任务被自动清理、能正常重新接到）。
 
 **排查同类问题**：应用户要求，检查了代码库里所有"从DB驱动的spell_scripts/spell_list数据查spellId、拿到SpellEntry后直接解引用"的同类模式，额外发现并修复4处同样会因坏/失效spellId崩溃的隐患（此前从未真正触发过，纯预防性加固）：
 - `UnitAI::CalculateSpellRange`（UnitAI.cpp:708）：直接读`spellInfo->rangeIndex`，加判空返回0.f——这是多处调用共用的底层函数，加固一次覆盖了它所有调用者。

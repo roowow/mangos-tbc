@@ -1305,6 +1305,8 @@ class Player : public Unit
         bool CanGiveQuestSourceItemIfNeed(Quest const* pQuest, ItemPosCountVec* dest = nullptr) const;
         void GiveQuestSourceItemIfNeed(Quest const* pQuest);
         bool TakeQuestSourceItem(uint32 quest_id, bool msg);
+        bool AbandonQuestInSlot(uint16 slot, bool sendMsg = true);
+        void AbandonQuestsRequiringSkill(uint32 skillId);
         bool GetQuestRewardStatus(uint32 quest_id) const;
         QuestStatus GetQuestStatus(uint32 quest_id) const;
         void SetQuestStatus(uint32 quest_id, QuestStatus status);

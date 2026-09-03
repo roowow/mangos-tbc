@@ -2065,7 +2065,7 @@ InventoryResult Loot::SendItem(Player* target, LootItem* lootItem, bool sendErro
             m_isChanged = true;
         }
         else if (sendError)
-            target->SendEquipError(msg, nullptr, nullptr, lootItem->itemId);
+            target->SendEquipError(msg, nullptr, nullptr, 0, lootItem->itemId);
     }
 
     if (!playerGotItem)

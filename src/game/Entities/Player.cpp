@@ -1026,7 +1026,7 @@ Item* Player::StoreNewItemInInventorySlot(uint32 itemEntry, uint32 amount)
             return pItem;
     }
     else
-        SendEquipError(msg, nullptr, nullptr, itemEntry);
+        SendEquipError(msg, nullptr, nullptr, 0, itemEntry);
 
     return nullptr;
 }
@@ -5716,6 +5716,11 @@ void Player::SetSkill(SkillStatusMap::iterator itr, uint16 value, uint16 max, ui
             mSkillStatus.erase(itr);
         else
             status.uState = SKILL_DELETED;
+
+        // A quest requiring this skill (e.g. a profession specialization quest) would
+        // otherwise stay stuck in the quest log forever, unable to progress or be
+        // re-accepted once the skill is relearned and releveled
+        AbandonQuestsRequiringSkill(id);
     }
 
     // Learn/unlearn all spells auto-trained by this skill on change
@@ -10409,7 +10414,7 @@ void Player::SetAmmo(uint32 item)
         InventoryResult msg = CanUseAmmo(item);
         if (msg != EQUIP_ERR_OK)
         {
-            SendEquipError(msg, nullptr, nullptr, item);
+            SendEquipError(msg, nullptr, nullptr, 0, item);
             return;
         }
     }
@@ -14068,7 +14073,7 @@ bool Player::CanGiveQuestSourceItemIfNeed(Quest const* pQuest, ItemPosCountVec* 
 
         if (msg == EQUIP_ERR_OK)
             return true;
-        SendEquipError(msg, nullptr, nullptr, srcitem);
+        SendEquipError(msg, nullptr, nullptr, 0, srcitem);
         return false;
     }
 
@@ -14108,7 +14113,7 @@ bool Player::TakeQuestSourceItem(uint32 quest_id, bool msg)
             if (res != EQUIP_ERR_OK)
             {
                 if (msg)
-                    SendEquipError(res, nullptr, nullptr, srcitem);
+                    SendEquipError(res, nullptr, nullptr, 0, srcitem);
                 return false;
             }
 
@@ -14116,6 +14121,53 @@ bool Player::TakeQuestSourceItem(uint32 quest_id, bool msg)
         }
     }
     return true;
+}
+
+bool Player::AbandonQuestInSlot(uint16 slot, bool sendMsg /*= true*/)
+{
+    uint32 quest = GetQuestSlotQuestId(slot);
+    if (!quest)
+        return true;
+
+    if (!TakeQuestSourceItem(quest, sendMsg))
+        return false;                                       // can't un-equip some items, reject quest cancel
+
+    if (const Quest* pQuest = sObjectMgr.GetQuestTemplate(quest))
+    {
+        if (pQuest->HasSpecialFlag(QUEST_SPECIAL_FLAG_TIMED))
+            RemoveTimedQuest(quest);
+
+        for (int i = 0; i < QUEST_SOURCE_ITEM_IDS_COUNT; ++i)
+        {
+            if (pQuest->ReqSourceId[i])
+            {
+                ItemPrototype const* iProto = ObjectMgr::GetItemPrototype(pQuest->ReqSourceId[i]);
+                if (iProto && iProto->Bonding == BIND_QUEST_ITEM)
+                    DestroyItemCount(pQuest->ReqSourceId[i], pQuest->ReqSourceCount[i], true, false, true);
+            }
+        }
+    }
+
+    SetQuestStatus(quest, QUEST_STATUS_NONE);
+    SetQuestSlot(slot, 0);
+    return true;
+}
+
+void Player::AbandonQuestsRequiringSkill(uint32 skillId)
+{
+    if (!skillId)
+        return;
+
+    for (uint16 slot = 0; slot < MAX_QUEST_LOG_SIZE; ++slot)
+    {
+        uint32 questId = GetQuestSlotQuestId(slot);
+        if (!questId)
+            continue;
+
+        Quest const* pQuest = sObjectMgr.GetQuestTemplate(questId);
+        if (pQuest && pQuest->GetRequiredSkill() == skillId)
+            AbandonQuestInSlot(slot, false);
+    }
 }
 
 bool Player::GetQuestRewardStatus(uint32 quest_id) const
