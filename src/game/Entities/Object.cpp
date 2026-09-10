@@ -3174,6 +3174,20 @@ int32 WorldObject::CalculateSpellEffectValue(Unit const* target, SpellEntry cons
                 case SPELL_EFFECT_TRIGGER_SPELL_WITH_VALUE:
                     damage = true;
             }
+
+            // SPELL_EFFECT_TRIGGER_SPELL_WITH_VALUE only relays this value into the triggered
+            // spell's basePoints (see Spell::EffectTriggerSpellWithValue, which forces it in via
+            // CastCustomSpell) - it is not itself a damage effect. If the triggered spell also
+            // carries SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL, it will independently scale the
+            // relayed value again; scaling it here too would double it. Leave this effect's value
+            // unscaled so only the triggered spell's own calculation scales it (see OO/Changes.md,
+            // 2026-09-10 Fear Fiend Fel Flames double-scaling investigation).
+            if (damage && effect == SPELL_EFFECT_TRIGGER_SPELL_WITH_VALUE)
+            {
+                if (SpellEntry const* triggeredSpell = sSpellTemplate.LookupEntry<SpellEntry>(spellProto->EffectTriggerSpell[effect_index]))
+                    if (triggeredSpell->HasAttribute(SPELL_ATTR_SCALES_WITH_CREATURE_LEVEL) && triggeredSpell->spellLevel)
+                        damage = false;
+            }
         }
 
         if (damage)
