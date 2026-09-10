@@ -524,6 +524,7 @@ struct boss_bigbadwolfAI : public CombatAI
     void Reset() override
     {
         CombatAI::Reset();
+        m_creature->SetSpellList(m_creature->GetCreatureInfo()->SpellList);
     }
 
     void JustReachedHome() override
