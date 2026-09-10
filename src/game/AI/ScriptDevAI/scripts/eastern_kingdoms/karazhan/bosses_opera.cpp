@@ -615,6 +615,7 @@ enum JulianneActions
     JULIANNE_ATTACK_DELAY,
     JULIANNE_SUMMON_ROMULO,
     JULIANNE_RESURECT_SELF,
+    JULIANNE_ETERNAL_AFFECTION,
     JULIANNE_MAX
 };
 
@@ -627,6 +628,7 @@ struct boss_julianneAI : public CombatAI
         AddCustomAction(JULIANNE_ATTACK_DELAY, 9000u, [&]() { HandleAttackDelay(); });
         AddCustomAction(JULIANNE_SUMMON_ROMULO, true, [&]() { DoSummonRomulo(); });
         AddCustomAction(JULIANNE_RESURECT_SELF, true, [&]() { HandleResurectSelf(); });
+        AddCustomAction(JULIANNE_ETERNAL_AFFECTION, true, [&]() { HandleEternalAffection(); });
         Reset();
     }
 
@@ -649,6 +651,7 @@ struct boss_julianneAI : public CombatAI
     void Aggro(Unit* /*pWho*/) override
     {
         DoBroadcastText(SAY_JULIANNE_AGGRO, m_creature);
+        ResetTimer(JULIANNE_ETERNAL_AFFECTION, 25000);
     }
 
     void JustReachedHome() override
@@ -787,6 +790,32 @@ struct boss_julianneAI : public CombatAI
         if (!m_creature->IsInCombat())
             JustReachedHome();
     }
+
+    // Eternal Affection is a regular combat heal (unrelated to the scripted Undying Love/Full Health
+    // resurrection sequence above) - heal Romulo if he's alive, not currently faking death, and hurt;
+    // otherwise fall back to healing self.
+    void HandleEternalAffection()
+    {
+        // don't cast while faking death - the DB-driven spell list already skips
+        // casting during this window via GetCombatScriptStatus()/CanCastSpell(),
+        // this custom timer action needs the same guard applied manually
+        if (!m_bIsFakingDeath)
+        {
+            Unit* healTarget = m_creature;
+
+            if (m_instance)
+            {
+                if (Creature* pRomulo = m_instance->GetSingleCreatureFromStorage(NPC_ROMULO))
+                    if (pRomulo->IsAlive() && !pRomulo->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_UNINTERACTIBLE) && pRomulo->GetHealthPercent() < 90.f)
+                        healTarget = pRomulo;
+            }
+
+            if (healTarget->GetHealthPercent() < 95.f)
+                DoCastSpellIfCan(healTarget, SPELL_ETERNAL_AFFECTION);
+        }
+
+        ResetTimer(JULIANNE_ETERNAL_AFFECTION, urand(45000, 60000));
+    }
 };
 
 // 30907 - Drink Poison
@@ -830,6 +859,7 @@ struct boss_romuloAI : public CombatAI
         CombatAI::Reset();
         m_Phase                 = PHASE_ROMULO;
         m_bIsFakingDeath        = false;
+        m_creature->SetSpellList(m_creature->GetCreatureInfo()->SpellList);
     }
 
     void JustReachedHome() override

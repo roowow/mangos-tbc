@@ -821,3 +821,43 @@ AND creature_template.name LIKE '%%%s%%' LIMIT 1;
 - 数据库：`spell_template`表，36248/36820的`EffectBasePoints1/EffectBaseDice1/EffectDieSides1`，**tbcmangosdev和tbcmangos2均已同步**改成`216/0/27`。这张表没有`.reload`热更新命令，只在服务器启动时加载一次，需要跟代码一起走完整的重新编译部署/重启才会生效。
 
 **状态**：⏳ 代码+数据库改动均已完成并双库同步，逻辑推导+手工核算数值吻合，尚未通过部署后的实测战斗日志确认。
+
+## 2026-09-10 — 修复卡拉赞歌剧院"大灰狼"（17521）技能缺失
+
+**背景**：玩家反馈大灰狼（[db.nfuwow链接](https://db.nfuwow.com/70/?npc=17521)）打野缺技能。查`bosses_opera.cpp`发现`boss_bigbadwolfAI`要用的技能脚本（撕咬红帽子/恐怖咆哮/大范围横扫等）本身都已经写好并注册，但`creature_template.SpellList`是0，且`Reset()`里没有调`SetSpellList`——`Creature::LoadFromDB`的"SpellList=0时自动兜底成entry*100"逻辑，会被AI自己`Reset()`里显式调用`SetSpellList(GetCreatureInfo()->SpellList)`（传的还是原始0值）覆盖掉，导致技能列表始终是空的。
+
+**修复**：`boss_bigbadwolfAI::Reset()`补上`m_creature->SetSpellList(m_creature->GetCreatureInfo()->SpellList);`；数据库`creature_template.SpellList`（entry=17521）从0改成`1752101`，新增对应的`creature_spell_list`/`creature_spell_list_entry`三条技能（Pick Red Riding Hood/30769、Terrifying Howl/30752、Wide Swipe/30761），均`TargetId=0`（走技能自身隐式目标）。触发时机参考搜集到的社区资料交叉核对后定的计时器。
+
+修改文件：`src/game/AI/ScriptDevAI/scripts/eastern_kingdoms/karazhan/bosses_opera.cpp`。
+
+**是否数据库/代码改动**：两者都有，`creature_spell_list`改动已写入tbcmangosdev（待确认同步tbcmangos2），代码需重新编译部署。
+
+**状态**：⏳ 代码+数据库改动已完成，尚未编译部署验证。
+
+## 2026-09-10 — 修复卡拉赞歌剧院"罗密欧与朱丽叶"（17533/17534）技能缺失
+
+**背景**：玩家反馈罗密欧（[链接](https://db.nfuwow.com/70/?npc=17533)）/朱丽叶（[链接](https://db.nfuwow.com/70/?npc=17534)）打野缺技能，跟大灰狼同一类问题。
+
+**排查**：确认两者`creature_template.SpellList`都是0、都没有`creature_spell_list`数据；`boss_julianneAI::Reset()`本来就有`SetSpellList`调用，但`boss_romuloAI::Reset()`缺这一行，跟大灰狼是同一个漏洞模式。
+
+**修复**：
+- `boss_romuloAI::Reset()`补上`m_creature->SetSpellList(...)`。
+- 朱丽叶的"永恒之爱"（Eternal Affection/30878）是给罗密欧奶血的支援技能，不适合走`creature_spell_list`固定轮询，改成C++自定义计时动作：`JulianneActions`枚举加`JULIANNE_ETERNAL_AFFECTION`，构造函数`AddCustomAction`注册，`Aggro()`里`ResetTimer(..., 25000)`起始，新增`HandleEternalAffection()`——罗密欧活着且不在装死（`UNIT_FLAG_UNINTERACTIBLE`）状态且血量<90%时奶罗密欧，否则自奶，之后`urand(45000,60000)`重新排期。
+- 数据库：`creature_template.SpellList` 17533→`1753301`、17534→`1753401`；新增`creature_spell_list`：
+  - 罗密欧（1753301）：反身突刺/30815（`TargetId=0`，锥形AoE，implicit target=54自带方向性）、勇气/30841（`TargetId=0`，自增益）、致命横扫/30817、毒素突刺/30822（均`TargetId=0`，implicit target=6走当前仇恨目标）。
+  - 朱丽叶（1753401）：眩晕吸引/30889、迷情蒙蔽/30890（均`TargetId=100`随机玩家——两个都是控制技能，30889加眩晕、30890加魅惑+周期伤害，实际机制是拉/控随机队员而非固定打坦克，implicit target字段本身只会解析成当前仇恨目标，需要显式指定随机目标覆盖）、忠诚/30887（`TargetId=0`，自增益，implicit target=1）。
+  - 永恒之爱/30878不进`creature_spell_list`，由上面C++自定义动作驱动。
+
+计时器数值参考搜集到的多个AI/社区资料交叉核对（跟`spell_cone.ConeDegrees=-180`、`EffectBasePoints`具体数值等可验证细节逐条核对过，采信度较高的一份资料）后确定。
+
+修改文件：`src/game/AI/ScriptDevAI/scripts/eastern_kingdoms/karazhan/bosses_opera.cpp`。
+
+**是否数据库/代码改动**：两者都有，`creature_spell_list`/`creature_template.SpellList`改动已写入tbcmangosdev（待确认同步tbcmangos2），代码需重新编译部署。两个NPC在`creature`表里都没有静态刷点（跟大灰狼一样是纯召唤怪），测试用`.npc add 17533`/`.npc add 17534`临时召唤。
+
+**改完之后复查发现并修正的2个问题**：
+1. **致命横扫(30817)/毒素突刺(30822)的TargetId原来写成0，实际会导致这两个技能永远施放失败**——这两个技能的隐式目标类型是`TARGET_UNIT_ENEMY`(6，"当前仇恨目标")，`Spell::CheckCast`对这个目标类型有强制校验（`Spell.cpp:5430-5439`，`default: needs target`分支，`if (!target) return SPELL_FAILED_BAD_TARGETS;`），TargetId=0对应的是`creature_spell_targeting`里的"Hardcoded - none"（显式传空目标），会直接被这个校验挡掉，技能表现为"配了但从来不生效"——跟这次要修的问题症状一模一样，等于白修。反身突刺(30815，锥形AoE)和勇气(30841，自增益)不受影响，因为它们的隐式目标类型分别落在锥形AoE和CASTER自身两种在这个校验里被跳过的分支。已把这两条`TargetId`改成`1`（"Hardcoded - current"，当前仇恨目标），朱丽叶的眩晕吸引/迷情蒙蔽当时已经用的是`TargetId=100`（随机玩家，走`SelectAttackingTarget`拿到的是真实Unit指针，不会触发这个问题），不受影响。
+2. **HandleEternalAffection没有跳过朱丽叶自己装死的窗口**：`creature_spell_list`驱动的技能本身在`UnitAI::CanCastSpell()`里天然有`!m_combatScriptHappening`护栏（装死时`SetCombatScriptStatus(true)`会让所有列表技能自动停止施放），但永恒之爱是走C++自定义计时动作，绕过了这层保护，理论上可能在朱丽叶装死的10-22秒窗口内碰巧触发一次奶血，让"已死"的朱丽叶忽然对自己（或罗密欧）放一个治疗特效，破坏剧情演出。补上`if (!m_bIsFakingDeath)`判断，跟`DamageTaken`里其它地方用的同一个标志位保持一致。
+
+修改文件：`src/game/AI/ScriptDevAI/scripts/eastern_kingdoms/karazhan/bosses_opera.cpp`（HandleEternalAffection函数）。
+
+**状态**：⏳ 代码+数据库改动已完成（含复查修正），尚未编译部署验证。
