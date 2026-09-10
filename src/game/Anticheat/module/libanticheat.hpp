@@ -146,6 +146,10 @@ class SessionAnticheat final : public SessionAnticheatInterface
         // when the ban timer expires, do we ban the ip?
         bool _banIP;
 
+        // human-readable reason for the pending kick/ban, used for the notification mail sent
+        // to the player when the penalty is actually applied (see Update())
+        std::string _lastCheatReason;
+
         // unique fingerprint for this copy of the client
         uint32 _fingerprint;
 
@@ -161,10 +165,13 @@ class SessionAnticheat final : public SessionAnticheatInterface
         void EnterWorld();
 
         // delayed kick when cheat is detected an kick action is identified
-        void BeginKickTimer();
+        void BeginKickTimer(std::string const& reason);
 
         // delayed ban (account and/or ip) when cheat is detected an ban action is identified
-        void BeginBanTimer(bool account, bool ip);
+        void BeginBanTimer(bool account, bool ip, std::string const& reason);
+
+        // sends the player a system mail explaining why they were just kicked/banned by the anticheat
+        void SendCheatNotificationMail(char const* penalty) const;
 
     public:
         // this is down here because a destructor is NOT required by the interface

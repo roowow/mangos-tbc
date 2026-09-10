@@ -963,8 +963,31 @@ bool Movement::IsTeleportAllowed(MovementInfo const& movementInfo, float& distan
     float deltaZ = _me->GetPositionZ() - movementInfo.pos.z;
     distance = sqrt(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ);
 
-    if (distance < 40.0f)
+    // Scale the allowed distance by the player's current speed rate so legitimately fast
+    // movement (mounts, speed buffs, flying) does not get flagged just because it covers
+    // more ground per movement packet than a normal-speed player would.
+    float const maxDistance = 40.0f * std::max(1.0f, _me->GetSpeedRate(movementInfo.GetSpeedType()));
+
+    if (distance < maxDistance)
+    {
+        // Even within the allowed distance, flag suspicious axis movement: if neither the
+        // previous nor the current packet has a flag that would explain a position change
+        // (jumping, falling - short or far - or swimming), a noticeable Z shift is very
+        // likely a faked position rather than legitimate movement. MOVEFLAG_FALLING (as
+        // opposed to MOVEFLAG_FALLINGFAR) covers the ordinary short falls that happen
+        // constantly during normal play (stepping off a ledge, uneven terrain, stairs),
+        // so it must be excluded too or this flags routine movement as a teleport hack.
+        MovementFlags const explainsZChange = MovementFlags(MOVEFLAG_JUMPING | MOVEFLAG_FALLING | MOVEFLAG_FALLINGFAR);
+        if (GetLastMovementInfo().ctime &&
+            !GetLastMovementInfo().HasMovementFlag(explainsZChange) &&
+            !movementInfo.HasMovementFlag(explainsZChange) &&
+            !GetLastMovementInfo().HasMovementFlag(MOVEFLAG_SWIMMING) &&
+            !movementInfo.HasMovementFlag(MOVEFLAG_SWIMMING) &&
+            std::abs(GetLastMovementInfo().pos.z - movementInfo.pos.z) > 2.0f)
+            return false;
+
         return true;
+    }
 
     return false;
 }

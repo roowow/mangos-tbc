@@ -22,6 +22,7 @@
 #include "Tools/Language.h"
 #include "Globals/ObjectMgr.h"
 #include "Log/Log.h"
+#include "Mails/Mail.h"
 
 #include "Antispam/antispammgr.hpp"
 #include "Antispam/antispam.hpp"
@@ -716,14 +717,17 @@ void SessionAnticheat::EnterWorld()
     _movementData->HandleEnterWorld();
 }
 
-void SessionAnticheat::BeginKickTimer()
+void SessionAnticheat::BeginKickTimer(std::string const& reason)
 {
     // if the kick or ban timers are already running, don't restart this, otherwise repeated hacks means they'll be online forever!
     if (!_kickTimer && !_banTimer)
+    {
         _kickTimer = sAnticheatConfig.GetKickDelay();
+        _lastCheatReason = reason;
+    }
 }
 
-void SessionAnticheat::BeginBanTimer(bool account, bool ip)
+void SessionAnticheat::BeginBanTimer(bool account, bool ip, std::string const& reason)
 {
     // if the timer is already running, don't restart it, otherwise repeated hacks means they'll be online forever!
     if (!!_banTimer)
@@ -732,6 +736,24 @@ void SessionAnticheat::BeginBanTimer(bool account, bool ip)
     _banAccount = account;
     _banIP = ip;
     _banTimer = sAnticheatConfig.GetBanDelay();
+    _lastCheatReason = reason;
+}
+
+void SessionAnticheat::SendCheatNotificationMail(char const* penalty) const
+{
+    Player* player = _session->GetPlayer();
+    if (!player)
+        return;
+
+    std::string const subject = "反作弊系统通知";
+    std::string const body = std::string("尊敬的玩家：\n\n")
+        + "系统反作弊模块检测到你的账号存在异常行为，已自动执行以下处理：\n\n"
+        + "触发原因：" + (_lastCheatReason.empty() ? "未知" : _lastCheatReason) + "\n\n"
+        + "处罚结果：" + penalty
+        + "\n\n如果你认为这是误判，可前往论坛反馈。";
+
+    MailDraft(subject, body)
+        .SendMailTo(MailReceiver(player->GetObjectGuid()), MailSender(MAIL_NORMAL, uint32(0), MAIL_STATIONERY_DEFAULT));
 }
 
 void SessionAnticheat::Update(uint32 diff)
@@ -743,6 +765,7 @@ void SessionAnticheat::Update(uint32 diff)
         else
         {
             _kickTimer = 0;
+            SendCheatNotificationMail("踢出游戏");
             _session->KickPlayer();
         }
     }
@@ -754,6 +777,7 @@ void SessionAnticheat::Update(uint32 diff)
         else
         {
             _banTimer = 0;
+            SendCheatNotificationMail("封禁账号（永久）");
 
             if (_banAccount)
                 sWorld.BanAccount(BAN_ACCOUNT, _session->GetAccountName(), 0, "Cheat detected", "Anticheat");
@@ -922,9 +946,9 @@ void SessionAnticheat::RecordCheat(uint32 actionMask, const char *detector, cons
 
     // either kick, or some combination of account and/or ip ban
     if (actionMask & CHEAT_ACTION_KICK)
-        BeginKickTimer();
+        BeginKickTimer(reason);
     else if (actionMask & (CHEAT_ACTION_BAN_ACCOUNT | CHEAT_ACTION_BAN_IP))
-        BeginBanTimer(!!(actionMask & CHEAT_ACTION_BAN_ACCOUNT), !!(actionMask & CHEAT_ACTION_BAN_IP));
+        BeginBanTimer(!!(actionMask & CHEAT_ACTION_BAN_ACCOUNT), !!(actionMask & CHEAT_ACTION_BAN_IP), reason);
 }
 
 bool SessionAnticheat::Movement(MovementInfo &mi, const WorldPacket &packet)

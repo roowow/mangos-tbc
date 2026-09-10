@@ -322,6 +322,38 @@ if (map && map->IsDungeon() && !map->IsRaid())
 
 ---
 
+### ⏸️ 可见性系统重写系列暂缓（2026-09-02，4条连续提交）
+
+`002f07408`(登录协议打包)+`3706ca625`(smsg_update_object广播重做)+`d5359cd44`(TBC可见性修正)+`2d5f1c6ba`(太阳井巨型生物可见性)——本质是把"给玩家发送新对象可见性更新"整条链路从"逐个SendPacket"改成"攒进共享`UpdateData`最后统一`data.SendData()`发送"，贯穿`Camera`/`Object::SendCreateUpdateToPlayer`/`Player::TeleportTo`/`GridNotifiers`/`Map::Update`等几乎全部"玩家看到新对象"路径，4条共约20+文件。这类"批量合并网络包发送"改动最容易踩"某调用点忘了真正调用SendData，整批更新被无声丢弃"的坑——我们之前"飞行卡死"生产事故根因就是同一领域类似遗漏，这次体量是那次的数倍。且不是修复我们玩家正在遇到的已知bug，纯粹官方网络性能优化。用户同意暂不处理，等后续更多验证/官方自己的追加bugfix后再考虑。
+
+### ⏸️ `43be10f9e`（BT伊利丹之战"阿兹诺斯之焰"AI重做）暂缓——unit_condition编号对不上（2026-09-02）
+
+内容大部分是安全的：`SPELL_RANGE_MARKER`(41997)施放时机从"召唤时"改到"进战瞬间遍历给每把刃补上"（更稳妥）；`FLAME_ACTION_FLAME_BLAST`/`FLAME_ACTION_SUMMON_BLAZE`两个战斗动作timer重构成独立随机区间；删掉一段已注释掉的死代码。
+
+**卡住的部分**：`DoPickChargeTarget()`自定义冲锋目标选择函数被整个删除，改用引擎通用的`SelectAttackingTarget(...)`配合`unit_condition`编号`989`（作者注释"目标没有该光环"，即排除已贴近阿兹诺斯之刃的玩家）。核对我们数据库：`spell_template`里41997本身没问题（施法者自身触发光环）；但`conditions`表989号在我们库里配置的是"Is In Area ID: 1497"——和"是否带某光环"完全不相关，也没有任何现成条件引用41997。要正确合并这段需要新建一条`CONDITION_AURA`(type=1, value1=41997)条件并搞清楚"排除/取反"语义（`conditions`表里`type`有一批负值-1/-2/-3，尚未查清是否是逻辑NOT/AND/OR之类的复合条件机制）。
+
+**状态**：⏸️ 用户选择先跳过，等条件系统取反机制查清楚后再处理；其余无DB依赖的部分（光环施放时机、timer重构、死代码清理）也一并暂缓，等这条整体处理。
+
+**独立后续 `32e1ab7ae`（已合并）**："烈焰之刃"脱离阿兹诺斯之刃触发狂暴的判断从`DIST_CALC_COMBAT_REACH`（先减双方碰撞体积再比较，实际触发距离比30码更宽松）改成`DIST_CALC_NONE`+平方距离比较（无碰撞体积修正，真正的30码，顺带省一次开方）。这条不依赖上面暂缓的`43be10f9e`，单独可应用 | 单行精度修正，无DB依赖 | ✅ 已 cherry-pick（`5e24eea2f`，与`43be10f9e`相邻代码格式化产生文本冲突，解决时保留新版本）
+
+| — | `f9f466356`+`4f2ce1815` | CI依赖版本升级(discord-webhook-notify、actions/checkout) | 纯`.github/workflows/*.yml`，不适用 | ⏭️ 跳过 |
+
+### ⏸️ `c49edad59`（老希尔斯布莱德丘陵萨尔护送大重做，#854）暂缓（2026-09-02）
+
+1000+行改动，捆绑多个具体bug修复：
+- **较严重（可能永久卡关）**：①护送小队NPC意外despawn时原代码完全不处理，副本状态永久卡在IN_PROGRESS，需退本重进；②末日猎手(Epoch Hunter)靠"移动到指定路径点"回调触发开打，小怪若被直接打死而非走到该点，回调永不触发，战斗永久卡死——新代码改用计时器（最后一波死亡后10秒强制开打）。
+- **较轻（体验/观感）**：杜恩霍尔德小怪召唤后立即攻击萨尔（应等萨尔"到家"才攻击）；萨尔上下马状态错乱、朝向不对；军需官"叫守卫/击晕"剧情从C++挪到DB脚本驱动（若只合并代码不配DB脚本，这段剧情会直接消失）。
+
+**依赖未满足**：①依赖已跳过的`3fa107236`（对话`DIALOGUE_STEP_TEXT`字段，本提交是我们代码库里第一次真正用到这个字段的地方，印证了当初"等配套提交"的判断，但配套体量很大）；②新增`THRALL_PATH_ID=5600435`外部路径ID，需要对应的DB路径点数据；③军需官剧情DB脚本缺失。`WaypointNode`构造函数对`std::optional<float>`的支持已经具备（更早提交已带来），这个依赖不算问题。
+
+**决策**：老希尔斯布莱德是新手向5人本，在人少的服务器上属于相对冷门内容；卡关问题可退本重进规避，非灾难性。三项依赖+改动体量与内容热度不匹配。用户选择先记录暂缓，等专门腾出时间集中处理（含先补`3fa107236`）。
+
+| — | `d1aef3af9` | GM命令`.npc info`补充4行输出（DamageMultiplier/DamageVariance/MinDMG/MaxDMG） | 纯只读展示，零行为改变，零风险 | ✅ 已 cherry-pick（`80c231c4e`） |
+
+| — | `ac6a89508` | "寒冬的寒气"(12579，冰法5层减冰抗debuff)加`AttributesEx`位0x800(`SPELL_ATTR_EX_AURA_UNIQUE`)，多个法师共享同一份光环而非各自叠加，与旁边已有的"嘲讽咆哮"(15971)同一机制 | 单行DBC修正，已验证机制 | ✅ 已 cherry-pick（`edb228eaa`），`tbcmangosdev`+`tbcmangos2`核实均已是目标值(2048)，本次UPDATE为no-op确认 |
+
+| — | `9802b03ba`+`f44f0ca1f` | 给已有的"技能不因脱战清除"机制(`AttributesServerSide`位0x4=`SPELL_ATTR_SS_IGNORE_EVADE`，已有多个技能在用)追加两个技能：温莎狂怒(15167)、狂风筛怒(32912) | 同一成熟机制的新增条目，单行DBC属性修正，风险低 | ✅ 已 cherry-pick（`885e849d9`+`5705271e4`），`tbcmangosdev`+`tbcmangos2`均已执行UPDATE并核实（AttributesServerSide: 0→4） |
+
 ## upstream（官方 cmangos/mangos-tbc）逐个提交审查
 
 `v3` 分支已加 `upstream` 远程（`https://github.com/cmangos/mangos-tbc.git`），当前落后 upstream/master 69 个提交（领先 20 个本地/Nmangos-tbc 自己的改动）。逐个从最早的开始审查，一条一条处理，分析完先记录在这里，确认后再实施（合并进仓库文件 + 同步到 `tbcmangosdev`）。
@@ -428,7 +460,21 @@ if (map && map->IsDungeon() && !map->IsRaid())
 
 | — | `3e69c84c9` | 黑色圣殿至尊者(Supremus)：坦克阶段结束后切换Fixate目标从"瞬间触发"改成8秒延迟；`DisableTimer`+`SetActionReadyStatus`两行合并成等价封装`DisableCombatAction`（核对实现一致）；一处纯改名(`SPELL_SLOW_SELF`→`SPELL_SNARE_SELF`，ID不变)+两处纯注释 | 单boss机制时机调整，风险低 | ✅ 已 cherry-pick（`3820865f1`） |
 
+| — | `4707f7eb4` | 紧接`e884ece9b`的必要配套：Gathios光环重新施放间隔从60秒减半到30秒——交替机制下若不减半，同一种光环实际重复频率会被稀释到120秒一次；减半后每种光环仍保持原来60秒一次的强度 | 单行改动，是刚合并那条的直接必要修正 | ✅ 已 cherry-pick（`7a87ea446`） |
+
 | — | `e884ece9b` | 黑色圣殿伊利丹议会 Gathios（与已实施的#35/#36"审判消耗圣印"同一boss）：光环选择(`m_aura`，奉献/五彩)从每次纯随机重roll改成和圣印选择一样的"固定交替+开局随机初始值"模式；圣印选择(`m_seal`)本身交替逻辑不变，只是初始值从固定`false`改成开局随机 | 单boss单文件AI逻辑微调，与已验证的圣印机制同一思路 | ✅ 已 cherry-pick（`11ae87205`） |
+
+| — | `33a18ff4d` | `PetAI::MoveInLineOfSight`紧跟一行`MANGOS_ASSERT(charmInfo)`，我们服务器是Debug编译部署、assert失败会真崩溃；补上和同文件其他几处（123/146/604行）一致的判断——`CanHandleCharm()`为true但`charmInfo`为空时走基类兜底逻辑而非assert（少数特殊脚本如刀锋山迅捷潜伏者才会重载`CanHandleCharm()`为true） | 单函数补齐与同文件已有模式一致的判断，直接降低我们Debug部署下的崩溃风险 | ✅ 已 cherry-pick（`51fa675d8`） |
+
+| — | `6904884e4` | CI：修复Windows发布流程标题里日期为空的问题(pwsh下`$GITHUB_OUTPUT`被误当bash变量展开成`$null`) | 只改`.github/workflows/windows-release.yml`，我们不用官方GitHub Actions CI，完全不适用 | ⏭️ 跳过，不适用 |
+
+| — | `7122d8477` | GM命令`.gobject turn/move/activate`原来靠聊天链接里的生成实例ID(lowguid)反查静态生成表`GetGOData`拿entry，动态生成（不在静态表）的GameObject会反查失败/崩溃；改成把entry直接编码进聊天链接(`Hgameobject:lowguid:entry`)，命令直接从链接读两个ID，不再依赖静态表反查 | 配套的`mangos_string`517号字符串新格式，核对`tbcmangosdev`+`tbcmangos2`**均已是新格式**（早前同步已带到），只需合并代码，DB侧零额外操作；只影响GM工具命令，不碰玩家可见功能 | ✅ 已 cherry-pick（`a9848815e`） |
+
+| — | `5d3bec797` | Dependabot自动升级CI依赖版本号(`mozilla-actions/sccache-action` 0.0.10→0.0.11) | 只改`.github/workflows/*.yml`，我们不用官方GitHub Actions CI（本地手动cmake编译），完全不适用 | ⏭️ 跳过，不适用 |
+
+| — | `b50bd7f5b` | `SCRIPT_COMMAND_MOVE_TO`(DB脚本命令3)"设为主移动生成器+脱战存续"标记，从错误映射的`dataint2 & 0x1`改成正确的`datalong2 & 0x2`；作者commit信息里自己都注明"@miraco回头确认下有没有已经用了这个要改" | 查了我们全部10张`dbscripts_on_*`表，command=3的行里新旧两种字段(`dataint2`位0x1、`datalong2`位0x2)都**完全没有任何一行在用**，合并零影响 | ✅ 已 cherry-pick（`1fd9a7ade`） |
+
+| — | `5a6bd7c1f` | `Unit::KnockBackWithAngle` 给"控制者"发击退包前新增判断：只有该玩家当前实际操控单位(`GetMover()`)正好是被击退单位本身才发，避免魅惑等场景下错位给玩家操控的另一单位套用击退动画 | 单函数加一层判断，正常路径（玩家自己/正常魅惑）不受影响，风险低 | ✅ 已 cherry-pick（`6b40b328c`） |
 
 | — | `bac14b6f4` | 关联官方issue #4120：给`Unit::SendMessageToAllWhoSeeMeMove`补一个遗漏分支——"我"是玩家且被别的实体操控(`moverOwner != GetObjectGuid()`，即被魅惑/操纵)时，直接给自己客户端补发移动包 | 该函数正是之前"飞行卡死"事故(`3098491fd`/`1076c2cd8`)引入、已被我们整体revert(`e3dc1ea3e`)撤销的机制，我们代码库里当前**没有这个函数**，无法独立应用。核对确认这条修的是"被魅惑/操控玩家收不到包"，与我们撤销的"飞行开始瞬间自己未注册进可见者列表"是不同的两个缺口，重新引入不会顺带解决我们的问题 | ⏭️ 暂不处理（依赖已撤销的父提交），记录备查 |
 
