@@ -151,8 +151,7 @@ void LoadHelper(CellGuidSet const& guid_set, CellPair& cell, GridRefManager<T>& 
         // if this assert is hit we have a problem somewhere because LoadFromDb should already add to map due to AI
         MANGOS_ASSERT(obj->IsInWorld());
 
-        UpdateData data;
-        obj->GetViewPoint().Event_AddedToWorld(&grid, data);
+        obj->GetViewPoint().Event_AddedToWorld(&grid);
 
         if (bg)
             bg->OnObjectDBLoad(obj);

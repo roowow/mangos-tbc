@@ -202,10 +202,17 @@ void Object::BuildCreateUpdateBlockForPlayer(UpdateData* data, Player* target) c
     data->AddUpdateBlock(buf);
 }
 
-void Object::SendCreateUpdateToPlayer(Player* player, UpdateData& data) const
+void Object::SendCreateUpdateToPlayer(Player* player) const
 {
     // send create update to player
-    BuildCreateUpdateBlockForPlayer(&data, player);
+    UpdateData updateData;
+    BuildCreateUpdateBlockForPlayer(&updateData, player);
+
+    for (size_t i = 0; i < updateData.GetPacketCount(); ++i)
+    {
+        WorldPacket packet = updateData.BuildPacket(i);
+        player->GetSession()->SendPacket(packet);
+    }
 }
 
 void Object::BuildValuesUpdateBlockForPlayer(UpdateData& data, Player* target) const
