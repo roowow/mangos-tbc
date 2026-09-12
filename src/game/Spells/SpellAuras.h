@@ -194,12 +194,15 @@ class SpellAuraHolder
         void LoginAuraDuration();
         void ForceUpdateAuraDuration();
         void SendAuraDuration();
+        WorldPacket BuildAuraDurationToCaster(uint32 slot = MAX_AURAS);
         void SendAuraDurationToCaster(Player* caster, uint32 slot = MAX_AURAS);
         void SendAuraDurationToCasterNeedUpdate(Player* caster);
 
         void SetAura(uint32 slot, bool remove) { m_target->SetUInt32Value(UNIT_FIELD_AURA + slot, remove ? 0 : GetId()); }
         void SetAuraFlag(uint32 slot, bool add);
         void SetAuraLevel(uint32 slot, uint32 level);
+
+        bool HasPeriodicAura() const;
 
         void SetCreationDelayFlag();
 
@@ -607,7 +610,7 @@ class AreaAura : public Aura
 {
     public:
         AreaAura(SpellEntry const* spellproto, SpellEffectIndex eff, int32 const* currentDamage, int32 const* currentBasePoints, SpellAuraHolder* holder, Unit* target, Unit* caster = nullptr, Item* castItem = nullptr, uint32 originalRankSpellId = 0);
-        virtual ~AreaAura();
+        virtual ~AreaAura() override;
 
         bool OnAreaAuraCheckTarget(Unit* target) const;
     protected:
@@ -622,7 +625,7 @@ class PersistentAreaAura : public Aura
 {
     public:
         PersistentAreaAura(SpellEntry const* spellproto, SpellEffectIndex eff, int32 const* currentDamage, int32 const* currentBasePoints, SpellAuraHolder* holder, Unit* target, Unit* caster = nullptr, Item* castItem = nullptr);
-        virtual ~PersistentAreaAura();
+        virtual ~PersistentAreaAura() override;
     protected:
         void Update(uint32 diff) override;
 };
@@ -632,7 +635,7 @@ class GameObjectAura : public Aura
 {
     public:
         GameObjectAura(SpellEntry const* spellproto, SpellEffectIndex eff, int32 const* currentDamage, int32 const* currentBasePoints, SpellAuraHolder* holder, Unit* target, GameObject* caster);
-        virtual ~GameObjectAura();
+        virtual ~GameObjectAura() override;
 
     protected:
         void Update(uint32 diff) override;

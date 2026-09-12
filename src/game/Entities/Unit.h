@@ -166,7 +166,7 @@ enum Swing
     TWOHANDEDSWING             = 2
 };
 
-enum VictimState
+enum VictimState : uint32
 {
     VICTIMSTATE_UNAFFECTED     = 0,                         // seen in relation with HITINFO_MISS
     VICTIMSTATE_NORMAL         = 1,
@@ -182,7 +182,7 @@ enum VictimState
 enum HitInfo
 {
     HITINFO_NORMALSWING         = 0x00000000,
-    HITINFO_UNK0                = 0x00000001,               // req correct packet structure
+    HITINFO_DEBUG               = 0x00000001,               // req correct packet structure
     HITINFO_NORMALSWING2        = 0x00000002,
     HITINFO_LEFTSWING           = 0x00000004,
     HITINFO_UNK3                = 0x00000008,
@@ -191,11 +191,16 @@ enum HitInfo
     HITINFO_RESIST              = 0x00000040,               // resisted atleast some damage
     HITINFO_CRITICALHIT         = 0x00000080,
     HITINFO_UNK8                = 0x00000100,               // wotlk?
+    HITINFO_UNK9                = 0x00000200,
+    HITINFO_UNK10               = 0x00000400,
     HITINFO_BLOCK               = 0x00000800,
-    HITINFO_UNK9                = 0x00002000,               // wotlk?
+    HITINFO_UNK12               = 0x00001000,
+    HITINFO_BLOOD_SPURT         = 0x00002000,               // blood spurt
     HITINFO_GLANCING            = 0x00004000,
     HITINFO_CRUSHING            = 0x00008000,
     HITINFO_NOACTION            = 0x00010000,
+    HITINFO_UNK17               = 0x00020000,
+    HITINFO_UNK18               = 0x00040000,
     HITINFO_SWINGNOHITSOUND     = 0x00080000
 };
 
@@ -687,9 +692,11 @@ struct CalcDamageInfo
     Unit*  target;               // Target for damage
     uint32 totalDamage;
     SubDamageInfo subDamage[MAX_ITEM_PROTO_DAMAGES];
-    uint32 blocked_amount;
+    uint32 blockedAmount;
     uint32 HitInfo;
-    uint32 TargetState;
+    VictimState TargetState;
+    uint32 meleeSpellId;         // next swing spells
+    uint32 attackerState;        // no known use in client
     // Helper
     WeaponAttackType attackType; //
     uint32 procAttacker;
@@ -1349,14 +1356,13 @@ class Unit : public WorldObject
         uint32 getClassMask() const { return convertEnumToFlag(getClass()); }
         uint8 getGender() const { return GetByteValue(UNIT_FIELD_BYTES_0, UNIT_BYTES_0_OFFSET_GENDER); }
 
-        float GetStat(Stats stat) const { return float(GetUInt32Value(UNIT_FIELD_STAT0 + stat)); }
-        void SetStat(Stats stat, int32 val) { SetStatInt32Value(UNIT_FIELD_STAT0 + stat, val); }
+        float GetStat(Stats stat) const { return float(GetUInt32Value(static_cast<uint16>(UNIT_FIELD_STAT0) + static_cast<uint16>(stat))); }
+        void SetStat(Stats stat, int32 val) { SetStatInt32Value(static_cast<uint16>(UNIT_FIELD_STAT0) + static_cast<uint16>(stat), val); }
 
         inline int32 GetArmor() const { return GetResistance(SPELL_SCHOOL_NORMAL) ; }
-        inline void SetArmor(int32 val) { SetStatInt32Value(UNIT_FIELD_RESISTANCES, val); }
-
-        inline int32 GetResistance(SpellSchools school) const { return GetInt32Value(UNIT_FIELD_RESISTANCES + school); }
-        inline void SetResistance(SpellSchools school, int32 val) { SetInt32Value(UNIT_FIELD_RESISTANCES + school, val); }
+        inline void SetArmor(int32 val) { SetStatInt32Value(static_cast<uint16>(UNIT_FIELD_RESISTANCES), val); }
+        inline int32 GetResistance(SpellSchools school) const { return GetInt32Value(static_cast<uint16>(UNIT_FIELD_RESISTANCES) + static_cast<uint16>(school)); }
+        inline void SetResistance(SpellSchools school, int32 val) { SetInt32Value(static_cast<uint16>(UNIT_FIELD_RESISTANCES) + static_cast<uint16>(school), val); }
 
         uint32 GetHealth()    const { return GetUInt32Value(UNIT_FIELD_HEALTH); }
         uint32 GetMaxHealth() const { return GetUInt32Value(UNIT_FIELD_MAXHEALTH); }
@@ -1370,8 +1376,8 @@ class Unit : public WorldObject
 
         Powers GetPowerType() const { return Powers(GetByteValue(UNIT_FIELD_BYTES_0, UNIT_BYTES_0_OFFSET_POWER_TYPE)); }
         void SetPowerType(Powers new_powertype);
-        uint32 GetPower(Powers power) const { return GetUInt32Value(UNIT_FIELD_POWER1 + power); }
-        uint32 GetMaxPower(Powers power) const { return GetUInt32Value(UNIT_FIELD_MAXPOWER1 + power); }
+        uint32 GetPower(Powers power) const { return GetUInt32Value(static_cast<uint16>(UNIT_FIELD_POWER1) + static_cast<uint16>(power)); }
+        uint32 GetMaxPower(Powers power) const { return GetUInt32Value(static_cast<uint16>(UNIT_FIELD_MAXPOWER1) + static_cast<uint16>(power)); }
         float GetPowerPercent() const { return (GetMaxPower(GetPowerType()) == 0) ? 0.0f : (GetPower(GetPowerType()) * 100.0f) / GetMaxPower(GetPowerType()); }
         float GetPowerPercent(Powers power) const { return (GetMaxPower(power) == 0) ? 0.0f : (GetPower(power) * 100.0f) / GetMaxPower(power); }
         void SetPower(Powers power, uint32 val);
@@ -1382,8 +1388,8 @@ class Unit : public WorldObject
         void ApplyMaxPowerMod(Powers power, uint32 val, bool apply);
         bool HasMana() { return GetPowerType() == POWER_MANA; }
 
-        uint32 GetAttackTime(WeaponAttackType att) const { return (uint32)(GetFloatValue(UNIT_FIELD_BASEATTACKTIME + att) / m_modAttackSpeedPct[att]); }
-        void SetAttackTime(WeaponAttackType att, uint32 val) { SetFloatValue(UNIT_FIELD_BASEATTACKTIME + att, val * m_modAttackSpeedPct[att]); }
+        uint32 GetAttackTime(WeaponAttackType att) const { return (uint32)(GetFloatValue(static_cast<uint16>(UNIT_FIELD_BASEATTACKTIME) + static_cast<uint16>(att)) / m_modAttackSpeedPct[att]); }
+        void SetAttackTime(WeaponAttackType att, uint32 val) { SetFloatValue(static_cast<uint16>(UNIT_FIELD_BASEATTACKTIME) + static_cast<uint16>(att), val * m_modAttackSpeedPct[att]); }
         void ApplyAttackTimePercentMod(WeaponAttackType att, float val, bool apply);
         void ApplyCastTimePercentMod(float val, bool apply);
 
@@ -1691,6 +1697,7 @@ class Unit : public WorldObject
             return m_spellAuraHolders.find(spellId) != m_spellAuraHolders.end();
         }
         bool HasAuraTypeWithCaster(AuraType auratype, ObjectGuid caster) const;
+        bool HasPeriodicAura() const;
         bool HasMechanicMaskOrDispelMaskAura(uint32 dispelMask, uint32 mechanicMask, Unit const* caster) const;
         bool HasNegativeAuraWithInterruptFlag(SpellAuraInterruptFlags flag) const;
         template<typename Func>
@@ -1757,7 +1764,7 @@ class Unit : public WorldObject
         SpellCastResult CastCustomSpell(SpellCastTargets& targets, SpellEntry const* spellInfo, int32 const* bp0, int32 const* bp1, int32 const* bp2, uint32 triggeredFlags, Item* castItem = nullptr, Aura* triggeredByAura = nullptr, ObjectGuid originalCaster = ObjectGuid(), SpellEntry const* triggeredBy = nullptr);
         SpellCastResult CastSpell(SpellCastArgs& args, SpellEntry const* spellInfo, uint32 triggeredFlags, Item* castItem = nullptr, Aura* triggeredByAura = nullptr, ObjectGuid originalCaster = ObjectGuid(), SpellEntry const* triggeredBy = nullptr);
         SpellCastResult CastSpell(SpellCastArgs& args, uint32 spellId, uint32 triggeredFlags, Item* castItem = nullptr, Aura* triggeredByAura = nullptr, ObjectGuid originalCaster = ObjectGuid(), SpellEntry const* triggeredBy = nullptr);
-        
+
         // Single flag overload uint32
         SpellCastResult CastSpell(Unit* Victim, uint32 spellId, TriggerCastFlags triggeredFlags, Item* castItem = nullptr, Aura* triggeredByAura = nullptr, ObjectGuid originalCaster = ObjectGuid(), SpellEntry const* triggeredBy = nullptr)
         { return CastSpell(Victim, spellId, uint32(triggeredFlags), castItem, triggeredByAura, originalCaster, triggeredBy); }
@@ -1788,7 +1795,7 @@ class Unit : public WorldObject
 
         void SendAIReaction(AiReaction reactionType);
 
-        void SendAttackStateUpdate(CalcDamageInfo* calcDamageInfo) const;
+        void SendAttackStateUpdate(CalcDamageInfo const& calcDamageInfo) const;
         void SendAttackStateUpdate(uint32 HitInfo, Unit* target, SpellSchoolMask damageSchoolMask, uint32 Damage, uint32 AbsorbDamage, int32 Resist, VictimState TargetState, uint32 BlockedAmount);
         void SendEnergizeSpellLog(Unit* pVictim, uint32 SpellID, uint32 Damage, Powers powertype) const;
         void SendEnvironmentalDamageLog(uint8 type, uint32 damage, uint32 absorb, int32 resist) const;
@@ -1803,7 +1810,7 @@ class Unit : public WorldObject
         void SendEnchantmentLog(ObjectGuid targetGuid, uint32 itemEntry, uint32 enchantId) const;
 
         static void CasterHitTargetWithSpell(Unit* realCaster, Unit* target, SpellEntry const* spellInfo, bool triggered, bool success = true);
-        bool CanInitiateAttack() const;
+        virtual bool CanInitiateAttack() const;
 
         Unit* SelectAttackingTarget(AttackingTarget target, uint32 position, uint32 spellId, uint32 selectFlags = 0, SelectAttackingTargetParams params = SelectAttackingTargetParams(), int32 unitConditionId = 0) const;
         Unit* SelectAttackingTarget(AttackingTarget target, uint32 position, SpellEntry const* spellInfo = nullptr, uint32 selectFlags = 0, SelectAttackingTargetParams params = SelectAttackingTargetParams(), int32 unitConditionId = 0) const;
@@ -1990,20 +1997,20 @@ class Unit : public WorldObject
 
         void DelaySpellAuraHolder(uint32 spellId, int32 delaytime, ObjectGuid casterGuid);
 
-        float GetResistanceBuffMods(SpellSchools school, bool positive) const { return GetFloatValue(positive ? UNIT_FIELD_RESISTANCEBUFFMODSPOSITIVE + school : UNIT_FIELD_RESISTANCEBUFFMODSNEGATIVE + school); }
-        void SetResistanceBuffMods(SpellSchools school, bool positive, float val) { SetFloatValue(positive ? UNIT_FIELD_RESISTANCEBUFFMODSPOSITIVE + school : UNIT_FIELD_RESISTANCEBUFFMODSNEGATIVE + school, val); }
-        void ApplyResistanceBuffModsMod(SpellSchools school, bool positive, float val, bool apply) { ApplyModSignedFloatValue(positive ? UNIT_FIELD_RESISTANCEBUFFMODSPOSITIVE + school : UNIT_FIELD_RESISTANCEBUFFMODSNEGATIVE + school, val, apply); }
-        void ApplyResistanceBuffModsPercentMod(SpellSchools school, bool positive, float val, bool apply) { ApplyPercentModFloatValue(positive ? UNIT_FIELD_RESISTANCEBUFFMODSPOSITIVE + school : UNIT_FIELD_RESISTANCEBUFFMODSNEGATIVE + school, val, apply); }
+        float GetResistanceBuffMods(SpellSchools school, bool positive) const { return GetFloatValue(positive ? static_cast<uint16>(UNIT_FIELD_RESISTANCEBUFFMODSPOSITIVE) + static_cast<uint16>(school) : static_cast<uint16>(UNIT_FIELD_RESISTANCEBUFFMODSNEGATIVE) + static_cast<uint16>(school)); }
+        void SetResistanceBuffMods(SpellSchools school, bool positive, float val) { SetFloatValue(positive ? static_cast<uint16>(UNIT_FIELD_RESISTANCEBUFFMODSPOSITIVE) + static_cast<uint16>(school) : static_cast<uint16>(UNIT_FIELD_RESISTANCEBUFFMODSNEGATIVE) + static_cast<uint16>(school), val); }
+        void ApplyResistanceBuffModsMod(SpellSchools school, bool positive, float val, bool apply) { ApplyModSignedFloatValue(positive ? static_cast<uint16>(UNIT_FIELD_RESISTANCEBUFFMODSPOSITIVE) + static_cast<uint16>(school) : static_cast<uint16>(UNIT_FIELD_RESISTANCEBUFFMODSNEGATIVE) + static_cast<uint16>(school), val, apply); }
+        void ApplyResistanceBuffModsPercentMod(SpellSchools school, bool positive, float val, bool apply) { ApplyPercentModFloatValue(positive ? static_cast<uint16>(UNIT_FIELD_RESISTANCEBUFFMODSPOSITIVE) + static_cast<uint16>(school) : static_cast<uint16>(UNIT_FIELD_RESISTANCEBUFFMODSNEGATIVE) + static_cast<uint16>(school), val, apply); }
         void InitStatBuffMods()
         {
-            for (int i = STAT_STRENGTH; i < MAX_STATS; ++i) SetFloatValue(UNIT_FIELD_POSSTAT0 + i, 0);
-            for (int i = STAT_STRENGTH; i < MAX_STATS; ++i) SetFloatValue(UNIT_FIELD_NEGSTAT0 + i, 0);
+            for (int i = STAT_STRENGTH; i < MAX_STATS; ++i) SetFloatValue(static_cast<uint16>(UNIT_FIELD_POSSTAT0) + i, 0);
+            for (int i = STAT_STRENGTH; i < MAX_STATS; ++i) SetFloatValue(static_cast<uint16>(UNIT_FIELD_NEGSTAT0) + i, 0);
         }
-        void ApplyStatBuffMod(Stats stat, float val, bool apply) { ApplyModSignedFloatValue((val > 0 ? UNIT_FIELD_POSSTAT0 + stat : UNIT_FIELD_NEGSTAT0 + stat), val, apply); }
+        void ApplyStatBuffMod(Stats stat, float val, bool apply) { ApplyModSignedFloatValue((val > 0 ? static_cast<uint16>(UNIT_FIELD_POSSTAT0) + stat : static_cast<uint16>(UNIT_FIELD_NEGSTAT0) + stat), val, apply); }
         void ApplyStatPercentBuffMod(Stats stat, float val, bool apply)
         {
-            ApplyPercentModFloatValue(UNIT_FIELD_POSSTAT0 + stat, val, apply);
-            ApplyPercentModFloatValue(UNIT_FIELD_NEGSTAT0 + stat, val, apply);
+            ApplyPercentModFloatValue(static_cast<uint16>(UNIT_FIELD_POSSTAT0) + stat, val, apply);
+            ApplyPercentModFloatValue(static_cast<uint16>(UNIT_FIELD_NEGSTAT0) + stat, val, apply);
         }
         void SetCreateStat(Stats stat, float val) { m_createStats[stat] = val; }
         void SetCreateHealth(uint32 val) { SetUInt32Value(UNIT_FIELD_BASE_HEALTH, val); }
@@ -2011,8 +2018,8 @@ class Unit : public WorldObject
         void SetCreateMana(uint32 val) { SetUInt32Value(UNIT_FIELD_BASE_MANA, val); }
         uint32 GetCreateMana() const { return GetUInt32Value(UNIT_FIELD_BASE_MANA); }
         uint32 GetCreatePowers(Powers power) const;
-        float GetPosStat(Stats stat) const { return GetFloatValue(UNIT_FIELD_POSSTAT0 + stat); }
-        float GetNegStat(Stats stat) const { return GetFloatValue(UNIT_FIELD_NEGSTAT0 + stat); }
+        float GetPosStat(Stats stat) const { return GetFloatValue(static_cast<uint16>(UNIT_FIELD_POSSTAT0) + static_cast<uint16>(stat)); }
+        float GetNegStat(Stats stat) const { return GetFloatValue(static_cast<uint16>(UNIT_FIELD_NEGSTAT0) + static_cast<uint16>(stat)); }
         float GetCreateStat(Stats stat) const { return m_createStats[stat]; }
         void SetCreateResistance(SpellSchools school, int32 val) { m_createResistances[school] = val; }
         int32 GetCreateResistance(SpellSchools school) const { return m_createResistances[school]; }
@@ -2119,7 +2126,7 @@ class Unit : public WorldObject
         void UpdateVisibilityAndView() override;            // overwrite WorldObject::UpdateVisibilityAndView()
 
         // common function for visibility checks for player/creatures with detection code
-        bool IsVisibleForOrDetect(Unit const* u, WorldObject const* viewPoint, bool detect, bool inVisibleList = false, bool is3dDistance = true, bool spell = false, bool ignorePhase = false) const;     
+        bool IsVisibleForOrDetect(Unit const* u, WorldObject const* viewPoint, bool detect, bool inVisibleList = false, bool is3dDistance = true, bool spell = false, bool ignorePhase = false) const;
 
         // virtual functions for all world objects types
         bool isVisibleForInState(Player const* u, WorldObject const* viewPoint, bool inVisibleList) const override;
@@ -2423,6 +2430,8 @@ class Unit : public WorldObject
         virtual bool CanWalk() const = 0;
         virtual bool IsFlying() const { return m_movementInfo.HasMovementFlag(MOVEFLAG_FLYING); }
 
+        void SendMessageToAllWhoSeeMeMove(WorldPacket const& data, ObjectGuid mover) const;
+
         // Take possession of an unit (pet, creature, ...)
         bool TakePossessOf(Unit* possessed);
 
@@ -2504,7 +2513,10 @@ class Unit : public WorldObject
 
         uint32 GetDamageDoneByOthers() { return m_damageByOthers; }
         uint32 GetModifierXpBasedOnDamageReceived(uint32 xp);
-        
+
+        void UpdateNextUpdateTime() override;
+        uint32 ShouldPerformObjectUpdate(uint32 const diff) override;
+
         void OverrideMountDisplayId(uint32 newDisplayId);
 
         void UpdateSplinePosition(bool relocateOnly = false);
@@ -2695,6 +2707,7 @@ class Unit : public WorldObject
         Position m_last_notified_position;
         BasicEvent* m_AINotifyEvent;
         ShortTimeTracker m_movesplineTimer;
+        bool m_hasPeriodicAura;
 
         Diminishing m_Diminishing;
 
@@ -2854,7 +2867,7 @@ struct TargetDistanceOrderNear
     // functor for operator ">"
     bool operator()(WorldObject const* _Left, WorldObject const* _Right) const
     {
-        return m_mainTarget->GetDistanceOrder(_Left, _Right, m_distcalc);
+        return m_mainTarget->GetDistanceOrder(_Left, _Right, true, m_distcalc);
     }
 };
 
@@ -2868,7 +2881,7 @@ struct TargetDistanceOrderFarAway
     // functor for operator "<"
     bool operator()(WorldObject const* _Left, WorldObject const* _Right) const
     {
-        return !m_mainTarget->GetDistanceOrder(_Left, _Right, m_distcalc);
+        return !m_mainTarget->GetDistanceOrder(_Left, _Right, true, m_distcalc);
     }
 };
 
@@ -2882,7 +2895,7 @@ struct LowestHPNearestOrder
     bool operator()(Unit const* _Left, Unit const* _Right) const
     {
         if (_Left->GetHealthPercent() == _Right->GetHealthPercent())
-            return m_mainTarget->GetDistanceOrder(_Left, _Right, m_distcalc);
+            return m_mainTarget->GetDistanceOrder(_Left, _Right, true, m_distcalc);
         return _Left->GetHealthPercent() < _Right->GetHealthPercent();
     }
 };

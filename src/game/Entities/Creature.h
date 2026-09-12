@@ -605,7 +605,7 @@ class Creature : public Unit
     public:
 
         explicit Creature(CreatureSubtype subtype = CREATURE_SUBTYPE_GENERIC);
-        virtual ~Creature();
+        virtual ~Creature() override;
 
         void AddToWorld() override;
         void RemoveFromWorld() override;
@@ -788,11 +788,12 @@ class Creature : public Unit
         void CallForHelp(float radius);
         void CallAssistance();
         void CallAssistance(Unit* enemy);
-        bool MarkCallAssistanceOnPull();
-        void CallAssistanceOnPull(Unit* enemy);
+        std::pair<bool, GuidVector> MarkCallAssistanceOnPull(Unit* enemy);
+        void CallAssistanceOnPull(Unit* enemy, GuidVector const& receiverList);
         void SetNoCallAssistance(bool val) { m_AlreadyCallAssistance = val; }
+        bool GetNoCallAssistance() { return m_AlreadyCallAssistance; }
         bool CanAssistTo(const Unit* u, const Unit* enemy, bool checkfaction = true) const;
-        bool CanInitiateAttack() const;
+        bool CanInitiateAttack() const override;
         bool CanCallForAssistance() const override { return m_canCallForAssistance; }
         void SetCanCallForAssistance(bool state) { m_canCallForAssistance = state; }
         bool IsInGroup(Unit const* other, bool party/* = false*/, bool ignoreCharms/* = false*/) const override;
@@ -926,6 +927,8 @@ class Creature : public Unit
         void UnregisterHitBySpell(uint32 spellId);
         void ResetSpellHitCounter();
 
+        uint32 GetNextUpdateTime() override;
+
         HighGuid GetParentHigh() const override { return HIGHGUID_UNIT; }
 
         void Heartbeat() override;
@@ -957,6 +960,9 @@ class Creature : public Unit
         void SetMountInfo(CreatureInfo const* info) override;
 
         void SetModelRunSpeed(float runSpeed) override { m_modelRunSpeed = runSpeed; }
+
+        void SetDelayedPetSpells() { m_delayedPetSpells = true; }
+        void TriggerDelayedPetSpells();
 
         bool IsCombatOnlyStealth() const { return m_combatOnlyStealth; }
         void SetCombatOnlyStealth(bool state) { m_combatOnlyStealth = state; }
@@ -1043,8 +1049,12 @@ class Creature : public Unit
 
         bool m_imposedCooldown;
 
+        bool m_delayedPetSpells;
+
         float m_healthMultiplier;
         float m_damageMultiplier;
+        float m_baseAP;
+        float m_baseRAP;
 
     private:
         GridReference<Creature> m_gridRef;

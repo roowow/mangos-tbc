@@ -47,7 +47,6 @@ struct world_map_kalimdor : public ScriptedMap
     uint32 m_encounter[MAX_ENCOUNTER];
     bool b_isOmenSpellCreditDone;
     std::array<std::vector<ObjectGuid>, MAX_ELEMENTS> m_aElementalRiftGUIDs;
-    uint32 m_uiDronesTimer;
     uint32 m_freedSpriteDarter;
     // Shade of the Horseman village attack event
     ShadeOfTheHorsemanData m_shadeData;
@@ -65,7 +64,6 @@ struct world_map_kalimdor : public ScriptedMap
         b_isOmenSpellCreditDone = false;
         for (auto& riftList : m_aElementalRiftGUIDs)
             riftList.clear();
-        m_uiDronesTimer = 0;
         memset(&m_encounter, 0, sizeof(m_encounter));
 
         m_shadeData.Reset();
@@ -332,17 +330,6 @@ struct world_map_kalimdor : public ScriptedMap
                     m_uiOmenMoonlightTimer -= diff;
             }
         }
-        // Used for Hive Tower area trigger in Silithus
-        if (m_uiDronesTimer)
-        {
-            if (m_uiDronesTimer <= diff)
-            {
-                SetData(TYPE_HIVE, NOT_STARTED);
-                m_uiDronesTimer = 0;
-            }
-            else
-                m_uiDronesTimer -= diff;
-        }
 
         if (m_shadeData.Update(diff))
         {
@@ -422,12 +409,6 @@ struct world_map_kalimdor : public ScriptedMap
                         instance->SetZoneWeather(0, AREAID_THERAMORE_ISLE, 3, 0.5f);
                         break;
                 }
-                break;
-            }
-            case TYPE_HIVE:
-            {
-                if (uiData == IN_PROGRESS)
-                    m_uiDronesTimer = 5 * MINUTE * IN_MILLISECONDS;
                 break;
             }
             case TYPE_FREEDOM_CREATURES:

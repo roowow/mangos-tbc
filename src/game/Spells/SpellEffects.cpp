@@ -56,6 +56,7 @@
 #include "AI/ScriptDevAI/include/sc_grid_searchers.h"
 #include "Maps/InstanceData.h"
 #include "Entities/Transports.h"
+#include "AI/EventAI/CreatureEventAI.h"
 
 pEffect SpellEffects[MAX_SPELL_EFFECTS] =
 {
@@ -1408,7 +1409,6 @@ void Spell::EffectDummy(SpellEffectIndex eff_idx)
                     if (unitTarget && unitTarget->GetEntry() == 15302)
                     {
                         ((Creature*)unitTarget)->ForcedDespawn();
-                        ((Creature*)unitTarget)->RemoveFromWorld();
                     }
 
                     return;
@@ -3218,9 +3218,6 @@ void Spell::EffectPowerBurn(SpellEffectIndex eff_idx)
     new_damage = int32(new_damage * multiplier);
 
     m_damagePerEffect[eff_idx] = CalculateSpellEffectDamage(unitTarget, new_damage, m_damageDoneMultiplier[eff_idx], eff_idx);
-
-    // should use here effect POWER_DRAIN because POWER_BURN is not implemented on client
-    m_spellLog.AddLog(uint32(SPELL_EFFECT_POWER_DRAIN), unitTarget->GetPackGUID(), new_damage, uint32(powertype), multiplier);
 }
 
 void Spell::EffectHeal(SpellEffectIndex eff_idx)
@@ -3475,7 +3472,7 @@ bool Spell::DoCreateItem(SpellEffectIndex /*eff_idx*/, uint32 itemtype, bool rep
 
         // if not created by another reason from full inventory or unique items amount limitation
         if (reportError)
-            player->SendEquipError(msg, nullptr, nullptr, newitemid);
+            player->SendEquipError(msg, nullptr, nullptr, 0, newitemid);
         return false;
     }
 
@@ -3542,7 +3539,7 @@ void Spell::EffectPersistentAA(SpellEffectIndex eff_idx)
     if (eff_idx == EFFECT_INDEX_0 && IsChanneledSpell(m_spellInfo))
     {
         m_caster->SetChannelObject(dynObj);
-        m_caster->SendForcedObjectUpdate();
+        // m_caster->SendForcedObjectUpdate();
     }
 }
 
@@ -6815,7 +6812,7 @@ void Spell::EffectSummonPlayer(SpellEffectIndex /*eff_idx*/)
 
     WorldPacket data(SMSG_SUMMON_REQUEST, 8 + 4 + 4);
     data << m_caster->GetObjectGuid();                      // summoner guid
-    data << uint32(m_caster->GetZoneId());                  // summoner zone
+    data << uint32(m_caster->GetAreaId());                  // summoner area
     data << uint32(MAX_PLAYER_SUMMON_DELAY * IN_MILLISECONDS); // auto decline after msecs
     static_cast<Player*>(unitTarget)->GetSession()->SendPacket(data);
 }
@@ -6844,9 +6841,6 @@ void Spell::EffectActivateObject(SpellEffectIndex effIdx)
                 case 17731:         // Onyxia - Eruption
                     gameObjTarget->SendGameObjectCustomAnim(gameObjTarget->GetObjectGuid());
                     break;
-                case 46638:         // Brutallus SWP - closes door
-                    gameObjTarget->ResetDoorOrButton();
-                    break;
                 default:
                     if (m_caster)
                         gameObjTarget->Use(m_caster, m_spellInfo);
@@ -6862,10 +6856,7 @@ void Spell::EffectActivateObject(SpellEffectIndex effIdx)
             break;
         case GameObjectActions::CLOSE:
         case GameObjectActions::REBUILD:
-            if (m_spellInfo->Id == 46610)
-                gameObjTarget->Use(m_caster, m_spellInfo);
-            else
-                gameObjTarget->ResetDoorOrButton(m_caster);
+            gameObjTarget->ResetDoorOrButton(m_caster);
             break;
         case GameObjectActions::DESPAWN:
             gameObjTarget->ForcedDespawn();

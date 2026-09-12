@@ -31,13 +31,13 @@ EndContentData */
 
 enum
 {
-    SAY_AGGRO1                      = -1540042,
-    SAY_AGGRO2                      = -1540043,
-    SAY_AGGRO3                      = -1540044,
-    SAY_SLAY1                       = -1540045,
-    SAY_SLAY2                       = -1540046,
-    SAY_DEATH                       = -1540047,
-    SAY_EVADE                       = -1540048,
+    SAY_AGGRO1                      = 17614,
+    SAY_AGGRO2                      = 17616,
+    SAY_AGGRO3                      = 17617,
+    SAY_SLAY1                       = 17619,
+    SAY_SLAY2                       = 17620,
+    SAY_DEATH                       = 17621,
+    SAY_EVADE                       = 18367,
 
     SPELL_BLADE_DANCE_CHARGE        = 30751,
     SPELL_BLADE_DANCE_TARGETING     = 30738,
@@ -285,7 +285,13 @@ struct boss_warchief_kargath_bladefistAI : public CombatAI
 struct npc_blade_dance_targetAI : public ScriptedAI
 {
     npc_blade_dance_targetAI(Creature* creature) : ScriptedAI(creature) {}
-    void Reset() override {}
+    void Reset() override
+    {
+        SetReactState(REACT_PASSIVE);
+        m_creature->SetImmobilizedState(true);
+        m_creature->SetLevitate(true);
+    }
+
     void DamageTaken(Unit* /*dealer*/, uint32& damage, DamageEffectType /*damagetype*/, SpellEntry const* /*spellInfo*/) override
     {
         damage = std::max(m_creature->GetMaxHealth(), damage);

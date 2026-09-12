@@ -1510,9 +1510,10 @@ std::pair<bool, bool> ScriptAction::GetScriptProcessTargets(WorldObject* origina
                     buddies.push_back(closest);
             }
             if (m_script->searchRadiusOrGuid > 0)
-                for (WorldObject* buddy : buddies)
-                    if (!buddy->IsWithinDist(origin, m_script->searchRadiusOrGuid))
-                        buddies.erase(std::remove(buddies.begin(), buddies.end(), buddy), buddies.end());
+                buddies.erase(std::remove_if(buddies.begin(), buddies.end(), [&](WorldObject* buddy)
+                {
+                    return !buddy->IsWithinDist(origin, m_script->searchRadiusOrGuid);
+                }), buddies.end());
 
             if (buddies.empty() && m_script->command != SCRIPT_COMMAND_TERMINATE_SCRIPT)
             {
@@ -1874,7 +1875,7 @@ bool ScriptAction::ExecuteDbscriptCommand(WorldObject* pSource, WorldObject* pTa
             }
 
             // Normal Movement
-            if ((m_script->textId[1] & 0x1) != 0) // make it main movegen
+            if ((m_script->moveTo.flags & 0x2) != 0) // make it main movegen
                 unit->GetMotionMaster()->Clear(false, true);
             else
                 unit->GetMotionMaster()->Clear();

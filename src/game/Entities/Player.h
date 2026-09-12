@@ -908,7 +908,7 @@ class Player : public Unit
         friend void Item::RemoveFromUpdateQueueOf(Player* player);
     public:
         explicit Player(WorldSession* session);
-        ~Player();
+        ~Player() override;
 
         void CleanupsBeforeDelete() override;
 
@@ -1126,14 +1126,15 @@ class Player : public Unit
         InventoryResult CanTakeMoreSimilarItems(uint32 entry, uint32 count) const { return _CanTakeMoreSimilarItems(entry, count, nullptr); }
         InventoryResult CanStoreNewItem(uint8 bag, uint8 slot, ItemPosCountVec& dest, uint32 item, uint32 count, uint32* no_space_count = nullptr) const
         {
-            return _CanStoreItem(bag, slot, dest, item, count, nullptr, false, no_space_count);
+            uint8 bagSlot = 0;
+            return _CanStoreItem(bag, slot, dest, item, count, bagSlot, nullptr, false, no_space_count);
         }
-        InventoryResult CanStoreItem(uint8 bag, uint8 slot, ItemPosCountVec& dest, Item* pItem, bool swap = false) const
+        InventoryResult CanStoreItem(uint8 bag, uint8 slot, ItemPosCountVec& dest, Item* pItem, uint8& bagSlot, bool swap = false) const
         {
             if (!pItem)
                 return EQUIP_ERR_ITEM_NOT_FOUND;
             uint32 count = pItem->GetCount();
-            return _CanStoreItem(bag, slot, dest, pItem->GetEntry(), count, pItem, swap, nullptr);
+            return _CanStoreItem(bag, slot, dest, pItem->GetEntry(), count, bagSlot, pItem, swap, nullptr);
         }
         InventoryResult CanStoreItems(Item** pItems, int count) const;
         InventoryResult CanEquipNewItem(uint8 slot, uint16& dest, uint32 item, bool swap) const;
@@ -1143,7 +1144,7 @@ class Player : public Unit
         InventoryResult CanEquipUniqueItem(ItemPrototype const* itemProto, uint8 except_slot = NULL_SLOT) const;
         InventoryResult CanUnequipItems(uint32 item, uint32 count) const;
         InventoryResult CanUnequipItem(uint16 pos, bool swap) const;
-        InventoryResult CanBankItem(uint8 bag, uint8 slot, ItemPosCountVec& dest, Item* pItem, bool swap, bool not_loading = true) const;
+        InventoryResult CanBankItem(uint8 bag, uint8 slot, ItemPosCountVec& dest, Item* pItem, bool swap, uint8& bagSlot, bool not_loading = true) const;
         InventoryResult CanUseItem(Item* pItem, bool direct_action = true) const;
         bool HasItemTotemCategory(uint32 TotemCategory) const;
         InventoryResult CanUseItem(ItemPrototype const* pProto) const;
@@ -1162,7 +1163,7 @@ class Player : public Unit
         Item* ConvertItem(Item* item, uint32 newItemId);
 
         InventoryResult _CanTakeMoreSimilarItems(uint32 entry, uint32 count, Item* pItem, uint32* no_space_count = nullptr) const;
-        InventoryResult _CanStoreItem(uint8 bag, uint8 slot, ItemPosCountVec& dest, uint32 entry, uint32 count, Item* pItem = nullptr, bool swap = false, uint32* no_space_count = nullptr) const;
+        InventoryResult _CanStoreItem(uint8 bag, uint8 slot, ItemPosCountVec& dest, uint32 entry, uint32 count, uint8& bagSlot, Item* pItem = nullptr, bool swap = false, uint32* no_space_count = nullptr) const;
 
         void ApplyEquipCooldown(Item* pItem);
         void SetAmmo(uint32 item);
@@ -1196,9 +1197,10 @@ class Player : public Unit
         void TakeExtendedCost(uint32 extendedCostId, uint32 count);
 
         uint32 GetMaxKeyringSize() const { return KEYRING_SLOT_END - KEYRING_SLOT_START; }
-        void SendEquipError(InventoryResult msg, Item* pItem, Item* pItem2 = nullptr, uint32 itemid = 0) const;
+        void SendEquipError(InventoryResult msg, Item* pItem = nullptr, Item* pItem2 = nullptr, uint8 slot = 0, uint32 itemid = 0) const;
         void SendBuyError(BuyResult msg, Creature* pCreature, uint32 item, uint32 param) const;
         void SendSellError(SellResult msg, Creature* pCreature, ObjectGuid itemGuid, uint32 param) const;
+        void SendOpenContainer(ObjectGuid itemGuid);
         void AddWeaponProficiency(uint32 newflag) { m_WeaponProficiency |= newflag; }
         void AddArmorProficiency(uint32 newflag) { m_ArmorProficiency |= newflag; }
         uint32 GetWeaponProficiency() const { return m_WeaponProficiency; }
@@ -1653,7 +1655,7 @@ class Player : public Unit
         void SendPetBar();
         void StartCinematic();
         void StopCinematic();
-        bool UpdateSkill(uint16 id, uint16 diff);
+        void UpdateSkill(uint16 id, uint16 diff);
         bool UpdateSkillPro(uint16 id, int32 Chance, uint16 diff);
 
         bool UpdateCraftSkill(uint32 spellid);
@@ -1706,7 +1708,7 @@ class Player : public Unit
         WorldSession* GetSession() const { return m_session; }
         void SetSession(WorldSession* s) { m_session = s; }
 
-        void BuildCreateUpdateBlockForPlayer(UpdateData* data, Player* target) const override;
+        void BuildCreateUpdateBlockForPlayer(UpdateData& data, Player* target) const override;
         void DestroyForPlayer(Player* target) const override;
         void SendLogXPGain(uint32 GivenXP, Unit* victim, uint32 RestXP, bool recruitAFriend, float groupRate) const;
 
@@ -1763,9 +1765,9 @@ class Player : public Unit
         void UpdateLocalChannels(uint32 newZone);
         void LeaveLFGChannel();
 
-        void UpdateDefense();
+        void UpdateDefense(uint32 procEx);
         void UpdateWeaponSkill(WeaponAttackType attType);
-        void UpdateCombatSkills(Unit* pVictim, WeaponAttackType attType, bool defence);
+        void UpdateCombatSkills(uint32 procEx, WeaponAttackType attType, bool defence);
         uint16 GetWeaponSkillIdForAttack(WeaponAttackType attType) const;
 
         SkillRaceClassInfoEntry const* GetSkillInfo(uint16 id, std::function<bool (SkillRaceClassInfoEntry const&)> filterfunc = nullptr) const;
@@ -1919,6 +1921,8 @@ class Player : public Unit
         void SendAuraDurationsForTarget(Unit* target);
         void SendAuraDurationsOnLogin(); // sends own durations
         void SendExtraAuraDurationsOnLogin(bool visible); // sends init and non visible slot auras
+
+        static std::vector<WorldPacket> BuildAurasForTarget(Player const& caster, Unit const& target);
 
         PlayerMenu* GetPlayerMenu() const { return m_playerMenu.get(); }
 
@@ -2123,13 +2127,14 @@ class Player : public Unit
         // currently visible objects at player client
         bool HasAtClient(WorldObject const* u) { return u == this || m_clientGUIDs.find(u->GetObjectGuid()) != m_clientGUIDs.end(); }
         void AddAtClient(WorldObject* target);
-        void RemoveAtClient(WorldObject* target);
+        void RemoveAtClient(WorldObject* target, bool skipRemovalOfAt = false);
+        void DestroyAtClient(WorldObject* target, bool skipRemovalOfAt = false);
         GuidSet& GetClientGuids() { return m_clientGUIDs; }
 
         bool IsVisibleInGridForPlayer(Player* pl) const override;
         bool IsVisibleGloballyFor(Player* u) const;
 
-        void UpdateVisibilityOf(WorldObject const* viewPoint, WorldObject* target);
+        void UpdateVisibilityOf(WorldObject const* viewPoint, WorldObject* target, UpdateData& updateData);
 
         template<class T>
         void UpdateVisibilityOf(WorldObject const* viewPoint, T* target, UpdateData& data, WorldObjectSet& visibleNow);
@@ -2142,6 +2147,8 @@ class Player : public Unit
         void HandleStealthedUnitsDetection();
 
         Camera& GetCamera() { return m_camera; }
+
+        void SetPhaseMask(uint32 newPhaseMask) override; // overwrite Unit::SetPhaseMask
 
         uint8 m_forced_speed_changes[MAX_MOVE_TYPE];
 
@@ -2308,6 +2315,9 @@ class Player : public Unit
 
         std::pair<uint32, bool> GetLastData() { return std::make_pair(m_lastDbGuid, m_lastGameObject); }
         void SetLastData(uint32 dbGuid, bool gameobject) { m_lastDbGuid = dbGuid; m_lastGameObject = gameobject; }
+
+        bool IsPendingPhaseChange() const { return m_pendingPhaseChange; }
+        void RemovePendingPhaseChange() { m_pendingPhaseChange = false; }
 
         int32 GetHighestAmmoMod() const { return m_highestAmmoMod; }
         void SetHighestAmmoMod(int32 amount) { m_highestAmmoMod = amount; }
@@ -2531,8 +2541,8 @@ class Player : public Unit
         bool m_isDebuggingAreaTriggers;
     private:
         // internal common parts for CanStore/StoreItem functions
-        InventoryResult _CanStoreItem_InSpecificSlot(uint8 bag, uint8 slot, ItemPosCountVec& dest, ItemPrototype const* pProto, uint32& count, bool swap, Item* pSrcItem) const;
-        InventoryResult _CanStoreItem_InBag(uint8 bag, ItemPosCountVec& dest, ItemPrototype const* pProto, uint32& count, bool merge, bool non_specialized, Item* pSrcItem, uint8 skip_bag, uint8 skip_slot) const;
+        InventoryResult _CanStoreItem_InSpecificSlot(uint8 bag, uint8 slot, ItemPosCountVec& dest, ItemPrototype const* pProto, uint32& count, bool swap, Item* pSrcItem, uint8& bagSlot) const;
+        InventoryResult _CanStoreItem_InBag(uint8 bag, ItemPosCountVec& dest, ItemPrototype const* pProto, uint32& count, bool merge, bool non_specialized, Item* pSrcItem, uint8 skip_bag, uint8 skip_slot, uint8& bagSlot) const;
         InventoryResult _CanStoreItem_InInventorySlots(uint8 slot_begin, uint8 slot_end, ItemPosCountVec& dest, ItemPrototype const* pProto, uint32& count, bool merge, Item* pSrcItem, uint8 skip_bag, uint8 skip_slot) const;
         Item* _StoreItem(uint16 pos, Item* pItem, uint32 count, bool clone, bool update);
 
@@ -2612,8 +2622,6 @@ class Player : public Unit
         bool m_needsZoneUpdate;
         uint32 m_newZone;
 
-        uint32 m_DetectInvTimer;
-
         // Temporary removed pet cache
         uint32 m_temporaryUnsummonedPetNumber;
         uint32 m_BGPetSpell;
@@ -2649,6 +2657,8 @@ class Player : public Unit
         std::map<uint32, ItemSetEffect> m_itemSetEffects;
 
         uint32 m_lastDbGuid; bool m_lastGameObject;
+
+        bool m_pendingPhaseChange;
 };
 
 void AddItemsSetItem(Player* player, Item* item);

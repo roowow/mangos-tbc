@@ -23,7 +23,7 @@ DROP TABLE IF EXISTS `db_version`;
 CREATE TABLE `db_version` (
   `version` varchar(120) DEFAULT NULL,
   `creature_ai_version` varchar(120) DEFAULT NULL,
-  `required_s2490_01_mangos_spell_threat_mask` bit(1) DEFAULT NULL
+  `required_s2491_01_mangos_spillover_rename` bit(1) DEFAULT NULL
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8 ROW_FORMAT=DYNAMIC COMMENT='Used DB version notes';
 
 --
@@ -4233,7 +4233,7 @@ INSERT INTO `mangos_string` VALUES
 (514,'%d - |cffffffff|Hcreature_entry:%d|h[%s]|h|r ',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL),
 (515,'%d%s - |cffffffff|Hcreature:%d|h[%s X:%f Y:%f Z:%f MapId:%d]|h|r ',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL),
 (516,'%d - |cffffffff|Hgameobject_entry:%d|h[%s]|h|r ',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL),
-(517,'%d%s, Entry %d - |cffffffff|Hgameobject:%d|h[%s X:%f Y:%f Z:%f MapId:%d]SpawnGroup:%u|h|r',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL),
+(517,'%d%s, Entry %d - |cffffffff|Hgameobject:%d:%d|h[%s X:%f Y:%f Z:%f MapId:%d]|h|r SpawnGroup:%u',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL),
 (518,'%d - |cffffffff|Hitemset:%d|h[%s %s]|h|r ',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL),
 (519,'|cffffffff|Htele:%s|h[%s]|h|r ',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL),
 (520,'%d - |cffffffff|Hspell:%d|h[%s]|h|r ',NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL),
@@ -12564,7 +12564,7 @@ CREATE TABLE `quest_template` (
   `RewMaxRepValue3` mediumint(9) NOT NULL DEFAULT '42999',
   `RewMaxRepValue4` mediumint(9) NOT NULL DEFAULT '42999',
   `RewMaxRepValue5` mediumint(9) NOT NULL DEFAULT '42999',
-  `ReputationSpilloverMask` tinyint unsigned NOT NULL DEFAULT '0',
+  `RewFactionFlags` tinyint unsigned NOT NULL DEFAULT '0',
   `RewHonorableKills` int(10) unsigned NOT NULL DEFAULT '0',
   `RewOrReqMoney` int(11) NOT NULL DEFAULT '0',
   `RewMoneyMaxLevel` int(10) unsigned NOT NULL DEFAULT '0',

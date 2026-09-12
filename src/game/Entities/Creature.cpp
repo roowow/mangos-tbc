@@ -146,8 +146,8 @@ Creature::Creature(CreatureSubtype subtype) : Unit(),
     m_isInvisible(false), m_ignoreMMAP(false), m_forceAttackingCapability(false),
     m_settings(this),
     m_countSpawns(false),
-    m_creatureGroup(nullptr), m_imposedCooldown(false), m_healthMultiplier(1.f), m_damageMultiplier(1.f),
-    m_creatureInfo(nullptr), m_mountInfo(nullptr),
+    m_creatureGroup(nullptr), m_imposedCooldown(false), m_healthMultiplier(1.f), m_damageMultiplier(1.f), m_baseAP(0), m_baseRAP(0),
+    m_creatureInfo(nullptr), m_mountInfo(nullptr), m_delayedPetSpells(false),
     m_combatOnlyStealth(false)
 {
     m_valuesCount = UNIT_END;
@@ -157,6 +157,8 @@ Creature::Creature(CreatureSubtype subtype) : Unit(),
 
 Creature::~Creature()
 {
+    if (GetVisibilityData().IsLargeVisibility())
+        printf("");
     CleanupsBeforeDelete();
 }
 
@@ -271,7 +273,6 @@ void Creature::RemoveCorpse(bool inPlace)
 
     m_corpseExpirationTime = TimePoint();
     SetDeathState(DEAD);
-    UpdateObjectVisibility();
 
     delete m_loot;
     m_loot = nullptr;
@@ -303,14 +304,17 @@ void Creature::RemoveCorpse(bool inPlace)
     GetRespawnCoord(x, y, z, &o);
     GetMap()->CreatureRelocation(this, x, y, z, o);
 
-    // forced recreate creature object at clients
-    UnitVisibility currentVis = GetVisibility();
-    SetVisibility(VISIBILITY_REMOVE_CORPSE);
-    UpdateObjectVisibility();
-    SetVisibility(currentVis);                              // restore visibility state
-    UpdateObjectVisibility();
-
-    if (IsUsingNewSpawningSystem())
+    if (!IsUsingNewSpawningSystem()) // schedule out of range
+    {
+        auto& clientGuids = GetClientGuidsIAmAt();
+        for (auto& clientGuid : clientGuids)
+            if (Player* client = GetMap()->GetPlayer(clientGuid))
+                client->RemoveAtClient(this, true);
+        GetMap()->AddUpdateRemoveObject(GetClientGuidsIAmAt(), GetObjectGuid());
+        clientGuids.clear();
+        GetClientGuidsIAmAt().clear();
+    }
+    else
         AddObjectToRemoveList();
 }
 
@@ -799,6 +803,9 @@ void Creature::Update(const uint32 diff)
             // Creature can be dead after unit update
             if (IsAlive())
                 RegenerateAll(diff);
+
+            if (m_delayedPetSpells && !ItsNewObject()) // after being added to world
+                TriggerDelayedPetSpells();
 
             break;
         }
@@ -1365,12 +1372,16 @@ void Creature::SelectLevel(uint32 forcedLevel /*= USE_DEFAULT_DATABASE_LEVEL*/)
         if (cinfo->DamageMultiplier >= 0)
         {
             usedDamageMulti = true;
-            mainMinDmg = ((cCLS->BaseDamage - cCLS->BaseDamage * (cinfo->DamageVariance / 2)) + (cCLS->BaseMeleeAttackPower / 14.0f)) * damageMulti;
-            mainMaxDmg = ((cCLS->BaseDamage + cCLS->BaseDamage * (cinfo->DamageVariance / 2)) + (cCLS->BaseMeleeAttackPower / 14.0f)) * damageMulti;
+            mainMinDmg = ((cCLS->BaseDamage - cCLS->BaseDamage * (cinfo->DamageVariance / 2)));
+            auto modifiedMainMinDmg = (mainMinDmg + (cCLS->BaseMeleeAttackPower / 14.0f)) * damageMulti;
+            mainMaxDmg = (cCLS->BaseDamage + cCLS->BaseDamage * (cinfo->DamageVariance / 2));
+            auto modifiedMainMaxDmg = ( + (cCLS->BaseMeleeAttackPower / 14.0f)) * damageMulti;
             offMinDmg = mainMinDmg; // Unitmod handles 50%
             offMaxDmg = mainMaxDmg;
-            minRangedDmg = ((cCLS->BaseDamage - cCLS->BaseDamage * (cinfo->DamageVariance / 2)) + (cCLS->BaseRangedAttackPower / 14.0f)) * damageMulti;
-            maxRangedDmg = ((cCLS->BaseDamage + cCLS->BaseDamage * (cinfo->DamageVariance / 2)) + (cCLS->BaseRangedAttackPower / 14.0f)) * damageMulti;
+            minRangedDmg = (cCLS->BaseDamage - cCLS->BaseDamage * (cinfo->DamageVariance / 2));
+            auto modifiedMinRangedDmg = ( + (cCLS->BaseRangedAttackPower / 14.0f)) * damageMulti;
+            maxRangedDmg = (cCLS->BaseDamage + cCLS->BaseDamage * (cinfo->DamageVariance / 2));
+            auto modifiedMaxRangedDmg = ( + (cCLS->BaseRangedAttackPower / 14.0f)) * damageMulti;
 
             auto oldMainMinDmg = ((cCLS->BaseDamageOLD * cinfo->DamageVarianceOLD) + (cCLS->BaseMeleeAttackPower / 14.0f)) * (cinfo->MeleeBaseAttackTime / 1000.0f) * damageMultiOLD;
             auto oldMainMaxDmg = ((cCLS->BaseDamageOLD * cinfo->DamageVarianceOLD * 1.5f) + (cCLS->BaseMeleeAttackPower / 14.0f)) * (cinfo->MeleeBaseAttackTime / 1000.0f) * damageMultiOLD;
@@ -1500,8 +1511,8 @@ void Creature::SelectLevel(uint32 forcedLevel /*= USE_DEFAULT_DATABASE_LEVEL*/)
     SetBaseWeaponDamage(RANGED_ATTACK, MAXDAMAGE, maxRangedDmg);
 
     // attack power
-    SetModifierValue(UNIT_MOD_ATTACK_POWER, BASE_VALUE, meleeAttackPwr * damageMod);
-    SetModifierValue(UNIT_MOD_ATTACK_POWER_RANGED, BASE_VALUE, rangedAttackPwr * damageMod);
+    m_baseAP = meleeAttackPwr;
+    m_baseRAP = rangedAttackPwr;
 
     // primary attributes
     SetCreateStat(STAT_STRENGTH, strength);
@@ -1650,6 +1661,21 @@ bool Creature::IsDealTripleDamageToPets() const
 bool Creature::IsEnemyCheckIgnoresLos() const
 {
     return GetSettings().HasFlag(CreatureStaticFlags3::ENEMY_CHECK_IGNORES_LOS);
+}
+
+void Creature::TriggerDelayedPetSpells()
+{
+    Player* player = const_cast<Player*>(GetControllingPlayer());
+    if (!player)
+        return;
+
+    player->SetCharm(this);                                    // save guid of charmed creature
+    player->UpdateClientControl(this, true, true);             // transfer client control to the creature after altering flags
+    player->PossessSpellInitialize();                          // TODO: Meant to be after update object with the uf flag
+
+    ForceValuesUpdateForFlag(UF_FLAG_OWNER_ONLY);
+
+    m_delayedPetSpells = false;
 }
 
 bool Creature::CreateFromProto(uint32 dbGuid, uint32 guidlow, CreatureInfo const* cinfo, const CreatureData* data /*=nullptr*/, GameEventCreatureData const* eventData /*=nullptr*/)
@@ -2235,27 +2261,42 @@ void Creature::CallAssistance(Unit* enemy)
     }
 }
 
-bool Creature::MarkCallAssistanceOnPull()
+std::pair<bool, GuidVector> Creature::MarkCallAssistanceOnPull(Unit* enemy)
 {
     bool stored = m_AlreadyCallAssistance;
     SetNoCallAssistance(true);
 
     if (!CanCallForAssistance())
-        return false;
+        return {false, GuidVector()};
 
-    return stored;
+    float radius = sWorld.getConfig(CONFIG_FLOAT_CREATURE_FAMILY_ASSISTANCE_RADIUS);
+    if (GetCreatureInfo()->CallForHelp > 0)
+        radius = GetCreatureInfo()->CallForHelp;
+
+    CreatureList receiverList;
+    MaNGOS::AnyAssistCreatureInRangeCheck u_check(this, enemy, radius);
+    MaNGOS::CreatureListSearcher<MaNGOS::AnyAssistCreatureInRangeCheck> searcher(receiverList, u_check);
+    Cell::VisitAllObjects(this, searcher, radius);
+    GuidVector guids;
+    for (Creature* creature : receiverList)
+        guids.push_back(creature->GetObjectGuid());
+    return {stored, guids};
 }
 
-void Creature::CallAssistanceOnPull(Unit* enemy)
+void Creature::CallAssistanceOnPull(Unit* enemy, GuidVector const& receiverList)
 {
     if (enemy && !HasCharmer())
     {
         MANGOS_ASSERT(AI());
 
-        float radius = sWorld.getConfig(CONFIG_FLOAT_CREATURE_FAMILY_ASSISTANCE_RADIUS);
-        if (GetCreatureInfo()->CallForHelp > 0)
-            radius = GetCreatureInfo()->CallForHelp;
-        AI()->SendAIEventAround(AI_EVENT_CALL_ASSISTANCE, enemy, 0, radius);
+        for (ObjectGuid receiverGuid : receiverList)
+        {
+            if (Creature* receiver = GetMap()->GetAnyTypeCreature(receiverGuid))
+            {
+                receiver->AI()->ReceiveAIEvent(AI_EVENT_CALL_ASSISTANCE, this, enemy, 0);
+                receiver->AI()->HandleAssistanceCall(this, enemy); // Special case for type 0 (call-assistance)
+            }
+        }
     }
 }
 
@@ -3180,6 +3221,14 @@ void Creature::UnregisterHitBySpell(uint32 spellId)
 void Creature::ResetSpellHitCounter()
 {
     m_hitBySpells.clear();
+}
+
+uint32 Creature::GetNextUpdateTime()
+{
+    if (!HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PLAYER_CONTROLLED) && m_deathState != ALIVE)
+        return 500;
+
+    return WorldObject::GetNextUpdateTime();
 }
 
 void Creature::Heartbeat()

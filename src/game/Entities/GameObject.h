@@ -555,6 +555,15 @@ struct GameObjectInfo
         }
     }
 
+    bool IsUsableInCombat() const
+    {
+        switch (type)
+        {
+            case GAMEOBJECT_TYPE_CHEST: return chest.notInCombat == 0;
+            default: return true;
+        }
+    }
+
     bool IsServerOnly() const
     {
         switch (type)
@@ -563,6 +572,52 @@ struct GameObjectInfo
             case GAMEOBJECT_TYPE_TRAP: return trap.serverOnly;
             case GAMEOBJECT_TYPE_SPELL_FOCUS: return spellFocus.serverOnly;
             case GAMEOBJECT_TYPE_AURA_GENERATOR: return auraGenerator.serverOnly;
+            default: return false;
+        }
+    }
+
+    bool IsGiganticGameObject() const
+    {
+        switch (id)
+        {
+            case 188421:
+            case 188523:
+            case 188524:
+            case 188119:
+                return true;
+            default: return false;
+        }
+    }
+
+    bool IsInfiniteGameObject() const
+    {
+        switch (type)
+        {
+            case GAMEOBJECT_TYPE_MO_TRANSPORT:
+                return true;
+            default: return false;
+        }
+    }
+
+    bool IsLargeOrBiggerGameObject() const
+    {
+        return IsLargeGameObject() || IsGiganticGameObject() || IsInfiniteGameObject();
+    }
+
+    bool IsSlowUpdateObject() const
+    {
+        switch (type)
+        {
+            case GAMEOBJECT_TYPE_BINDER:
+            case GAMEOBJECT_TYPE_GENERIC:
+            case GAMEOBJECT_TYPE_MAP_OBJECT:
+            case GAMEOBJECT_TYPE_DUEL_ARBITER:
+            case GAMEOBJECT_TYPE_MAILBOX:
+            case GAMEOBJECT_TYPE_MEETINGSTONE:
+            case GAMEOBJECT_TYPE_DUNGEON_DIFFICULTY:
+            case GAMEOBJECT_TYPE_GUILD_BANK:
+            case GAMEOBJECT_TYPE_BARBER_CHAIR:
+                return true;
             default: return false;
         }
     }
@@ -812,6 +867,8 @@ class GameObject : public WorldObject
         void SetFaction(uint32 faction) { SetUInt32Value(GAMEOBJECT_FACTION, faction); }
         uint32 GetLevel() const override { return GetUInt32Value(GAMEOBJECT_LEVEL); }
 
+        bool CanUseNow(Player const* player) const;
+
         void Use(Unit* user, SpellEntry const* spellInfo = nullptr);
 
         LootState GetLootState() const { return m_lootState; }
@@ -907,7 +964,7 @@ class GameObject : public WorldObject
         float GetStationaryZ() const { if (GetGOInfo()->type != GAMEOBJECT_TYPE_MO_TRANSPORT) return m_stationaryPosition.GetPositionZ(); return 0.f; }
         float GetStationaryO() const { if (GetGOInfo()->type != GAMEOBJECT_TYPE_MO_TRANSPORT) return m_stationaryPosition.GetPositionO(); return GetOrientation(); }
 
-        std::pair<float, float> GetClosestChairSlotPosition(Unit* user) const;
+        std::pair<float, float> GetClosestChairSlotPosition(Unit const* user) const;
 
         SpellCastResult CastSpell(Unit* temporaryCaster, Unit* Victim, uint32 spellId, uint32 triggeredFlags, Item* castItem = nullptr, Aura* triggeredByAura = nullptr, ObjectGuid originalCaster = ObjectGuid(), SpellEntry const* triggeredBy = nullptr);
 
@@ -927,6 +984,9 @@ class GameObject : public WorldObject
         void SetGameObjectGroup(GameObjectGroup* group);
         void ClearGameObjectGroup();
         GameObjectGroup* GetGameObjectGroup() const { return m_goGroup; }
+
+        void UpdateNextUpdateTime() override;
+        uint32 ShouldPerformObjectUpdate(uint32 const diff) override;
 
     protected:
         uint32      m_spellId;
